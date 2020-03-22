@@ -8,7 +8,7 @@ def _make_divisible(v, divisor, min_value=None):
     It can be seen here:
     https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet.py
     Args:
-        v (int): The initial number of channel
+        v (float): The initial number of channel
         divisor (int)
         min_value (int): The minimum value for v
 
