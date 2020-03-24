@@ -459,3 +459,122 @@ class UnetDsv3(nn.Module):
 
     def forward(self, input):
         return self.dsv(input)
+
+
+class InvertedResidual(nn.Module):
+    def __init__(self, in_channels, out_channels, stride, expand_ratio):
+        super(InvertedResidual, self).__init__()
+        self.stride = stride
+        assert stride in [1, 2]
+
+        hidden_dim = int(round(in_channels * expand_ratio))
+        self.use_res_connect = self.stride == 1 and in_channels == out_channels
+
+        layers = []
+        if expand_ratio != 1:
+            # point-wise convolution
+            layers.append(Conv3dBNReLU(in_channels, hidden_dim, kernel_size=1))
+        layers.extend([
+            # depth-wise convolution
+            Conv3dBNReLU(hidden_dim, hidden_dim, stride=stride, groups=hidden_dim),
+            # point-wise convolution
+            nn.Conv3d(hidden_dim, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm3d(out_channels),
+        ])
+        self.conv = nn.Sequential(*layers)
+
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)
+
+
+class Conv3dBNReLU(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, groups=1):
+        padding = (kernel_size - 1) // 2
+        super(Conv3dBNReLU, self).__init__(
+            nn.Conv3d(in_channels, out_channels, kernel_size, stride, padding, groups=groups, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU6(inplace=True)
+        )
+
+
+def _make_divisible(v, divisor, min_value=None):
+    """
+    This function is taken from the original tf repo.
+    It ensures that all layers have a channel number that is divisible by divisor
+    It can be seen here:
+    https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet.py
+    Args:
+        v (float): The initial number of channel
+        divisor (int)
+        min_value (int): The minimum value for v
+
+    Returns:
+        int: a number of channels divisible by divisor
+    """
+    if min_value is None:
+        min_value = divisor
+    new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
+    # Make sure that round down does not go down by more than 10%.
+    if new_v < 0.9 * v:
+        new_v += divisor
+    return new_v
+
+class ASPPConv3d(nn.Sequential):
+    def __init__(self, in_channels, out_channels, dilation):
+        modules = [
+            nn.Conv3d(in_channels, out_channels, 3, padding=dilation, dilation=dilation, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True)
+        ]
+        super(ASPPConv3d, self).__init__(*modules)
+
+
+class ASPPPooling3d(nn.Sequential):
+    def __init__(self, in_channels, out_channels):
+        super(ASPPPooling3d, self).__init__(
+            nn.AdaptiveAvgPool3d(1),
+            nn.Conv3d(in_channels, out_channels, 1, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True))
+
+    def forward(self, x):
+        size = x.shape[-3:]  # Spatial shape
+        for mod in self:
+            x = mod(x)
+        return F.interpolate(x, size=size, mode='trilinear', align_corners=False)
+
+
+class ASPP3d(nn.Module):
+    def __init__(self, in_channels, atrous_rates, out_channels=256):
+        super(ASPP3d, self).__init__()
+        modules = []
+        modules.append(nn.Sequential(
+            nn.Conv3d(in_channels, out_channels, 1, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True)))
+
+        rate1, rate2, rate3 = tuple(atrous_rates)
+        modules.append(ASPPConv3d(in_channels, out_channels, rate1))
+        modules.append(ASPPConv3d(in_channels, out_channels, rate2))
+        modules.append(ASPPConv3d(in_channels, out_channels, rate3))
+        modules.append(ASPPPooling3d(in_channels, out_channels))
+
+        self.convs = nn.ModuleList(modules)
+
+        self.project = nn.Sequential(
+            nn.Conv3d(5 * out_channels, out_channels, 1, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5))
+
+        self.last_channel = out_channels
+
+    def forward(self, x):
+        res = []
+        for conv in self.convs:
+            res.append(conv(x))
+        res = torch.cat(res, dim=1)
+        return self.project(res)
