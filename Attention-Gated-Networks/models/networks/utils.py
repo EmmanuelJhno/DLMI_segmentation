@@ -482,6 +482,7 @@ class InvertedResidual(nn.Module):
             nn.BatchNorm3d(out_channels),
         ])
         self.conv = nn.Sequential(*layers)
+        self.out_channels = out_channels
 
     def forward(self, x):
         if self.use_res_connect:
@@ -498,6 +499,7 @@ class Conv3dBNReLU(nn.Sequential):
             nn.BatchNorm3d(out_channels),
             nn.ReLU6(inplace=True)
         )
+        self.out_channels = out_channels
 
 
 def _make_divisible(v, divisor, min_value=None):
