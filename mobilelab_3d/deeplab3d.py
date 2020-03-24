@@ -64,6 +64,8 @@ class ASPP3d(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout(0.5))
 
+        self.last_channel = out_channels
+
     def forward(self, x):
         res = []
         for conv in self.convs:
