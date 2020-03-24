@@ -9,6 +9,7 @@ from models.networks_other import init_weights
 
 class _MobileNet3d(nn.Module):
     def __init__(self,
+                 in_channels=3,
                  width_mult=1.0,
                  round_nearest=8,
                  block=None):
@@ -43,7 +44,7 @@ class _MobileNet3d(nn.Module):
         # building first layer
         input_channel = _make_divisible(input_channel * width_mult, round_nearest)
         self.last_channel = _make_divisible(last_channel * max(1.0, width_mult), round_nearest)
-        features = [Conv3dBNReLU(3, input_channel, stride=2)]
+        features = [Conv3dBNReLU(in_channels, input_channel, stride=2)]
         # building inverted residual blocks
         for t, c, n, s in self.inverted_residual_setting:
             output_channel = _make_divisible(c * width_mult, round_nearest)
@@ -54,7 +55,7 @@ class _MobileNet3d(nn.Module):
         # building last several layers
         features.append(Conv3dBNReLU(input_channel, self.last_channel, kernel_size=1))
         # make it nn.Sequential
-        self.features = nn.ModuleList(*features)
+        self.features = nn.ModuleList(features)
         self.low_level_feats_channels = features[3].out_channels
 
         # weight initialization
@@ -89,7 +90,7 @@ class deeplab_mobilenet3d(nn.Module):
         self.width_mult = width_mult
 
         # Feature extraction through MobileNet
-        self.mobilenet = _MobileNet3d(width_mult=width_mult)
+        self.mobilenet = _MobileNet3d(width_mult=width_mult, in_channels=in_channels)
 
         # A-trou Spatial Pyramid Pooling
         self.aspp = ASPP3d(in_channels=self.mobilenet.last_channel,
@@ -102,7 +103,7 @@ class deeplab_mobilenet3d(nn.Module):
 
         # Final convolution
         self.final_conv = nn.Sequential(
-            Conv3dBNReLU(in_channels=self.aspp.last_channel,
+            Conv3dBNReLU(in_channels=2*self.aspp.last_channel,
                          out_channels=256,
                          kernel_size=3),
             Conv3dBNReLU(in_channels=256,
