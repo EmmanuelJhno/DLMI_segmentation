@@ -113,6 +113,8 @@ class deeplab_mobilenet3d(nn.Module):
         features = self.mobilenet(inputs)
         aspp = self.aspp(features)
         final = self.final(aspp)
+        x = F.interpolate(final, size=inputs.size()[2:],
+                          mode='trilinear', align_corners=True)
         return final
 
     @staticmethod
