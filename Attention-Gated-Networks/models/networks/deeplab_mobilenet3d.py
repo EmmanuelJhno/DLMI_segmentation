@@ -1,4 +1,6 @@
 import math
+
+import torch
 import torch.nn as nn
 from .utils import ASPP3d, InvertedResidual, _make_divisible, Conv3dBNReLU
 import torch.nn.functional as F
@@ -8,7 +10,6 @@ from models.networks_other import init_weights
 class _MobileNet3d(nn.Module):
     def __init__(self,
                  width_mult=1.0,
-                 inverted_residual_setting=None,
                  round_nearest=8,
                  block=None):
         """
@@ -28,8 +29,7 @@ class _MobileNet3d(nn.Module):
         input_channel = 32
         last_channel = 1280
 
-        if inverted_residual_setting is None:
-            inverted_residual_setting = [
+        self.inverted_residual_setting = [
                 # t, c, n, s
                 [1, 16, 1, 1],
                 [6, 24, 2, 2],
@@ -40,17 +40,12 @@ class _MobileNet3d(nn.Module):
                 [6, 320, 1, 1],
             ]
 
-        # only check the first element, assuming user knows t,c,n,s are required
-        if len(inverted_residual_setting) == 0 or len(inverted_residual_setting[0]) != 4:
-            raise ValueError("inverted_residual_setting should be non-empty "
-                             "or a 4-element list, got {}".format(inverted_residual_setting))
-
         # building first layer
         input_channel = _make_divisible(input_channel * width_mult, round_nearest)
         self.last_channel = _make_divisible(last_channel * max(1.0, width_mult), round_nearest)
         features = [Conv3dBNReLU(3, input_channel, stride=2)]
         # building inverted residual blocks
-        for t, c, n, s in inverted_residual_setting:
+        for t, c, n, s in self.inverted_residual_setting:
             output_channel = _make_divisible(c * width_mult, round_nearest)
             for i in range(n):
                 stride = s if i == 0 else 1
@@ -59,7 +54,8 @@ class _MobileNet3d(nn.Module):
         # building last several layers
         features.append(Conv3dBNReLU(input_channel, self.last_channel, kernel_size=1))
         # make it nn.Sequential
-        self.features = nn.Sequential(*features)
+        self.features = nn.ModuleList(*features)
+        self.low_level_feats_channels = features[3].out_channels
 
         # weight initialization
         for m in self.modules():
@@ -72,10 +68,14 @@ class _MobileNet3d(nn.Module):
                 nn.init.zeros_(m.bias)
 
     def forward(self, x):
-        x = self.features(x)
+        for layer in self.features[:4]:
+            x = layer(x)
+        low_level_feats = x
+        for layer in self.features[4:]:
+            x = layer(x)
         # Cannot use "squeeze" as batch-size can be 1 => must use reshape with x.shape[0]
         # x = nn.functional.adaptive_avg_pool3d(x, 1).reshape(x.shape[0], -1)
-        return x
+        return x, low_level_feats
 
 
 class deeplab_mobilenet3d(nn.Module):
@@ -95,10 +95,23 @@ class deeplab_mobilenet3d(nn.Module):
         self.aspp = ASPP3d(in_channels=self.mobilenet.last_channel,
                            atrous_rates=self.atrous_rates)
 
+        # Low-level features decoder
+        self.low_conv = Conv3dBNReLU(in_channels=self.mobilenet.low_level_feats_channels,
+                                     out_channels=self.aspp.last_channel,
+                                     kernel_size=1)
+
         # Final convolution
-        self.final = nn.Conv3d(in_channels=self.aspp.last_channel,
-                               out_channels=n_classes,
-                               kernel_size=1)
+        self.final_conv = nn.Sequential(
+            Conv3dBNReLU(in_channels=self.aspp.last_channel,
+                         out_channels=256,
+                         kernel_size=3),
+            Conv3dBNReLU(in_channels=256,
+                         out_channels=256,
+                         kernel_size=3),
+            nn.Conv3d(in_channels=256,
+                      out_channels=n_classes,
+                      kernel_size=3),
+        )
 
         # initialise weigths
         for m in self.modules():
@@ -110,12 +123,22 @@ class deeplab_mobilenet3d(nn.Module):
                 init_weights(m, init_type='kaiming')
 
     def forward(self, inputs):
-        features = self.mobilenet(inputs)
-        aspp = self.aspp(features)
-        final = self.final(aspp)
-        x = F.interpolate(final, size=inputs.size()[2:],
+        high_level_feats, low_level_feats = self.mobilenet(inputs)
+
+        # ASPP and upsampling
+        aspp = self.aspp(high_level_feats)
+        aspp = F.interpolate(aspp, size=low_level_feats.size()[2:],
+                             mode='trilinear', align_corners=True)
+
+        # Low-level feature extraction
+        low_level_feats = self.low_conv(low_level_feats)
+
+        # Concat and decode
+        x = torch.cat([low_level_feats, aspp], dim=1)
+        x = self.final_conv(x)
+        x = F.interpolate(x, size=inputs.size()[2:],
                           mode='trilinear', align_corners=True)
-        return final
+        return x
 
     @staticmethod
     def apply_argmax_softmax(pred):
