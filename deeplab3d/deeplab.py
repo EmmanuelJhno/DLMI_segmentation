@@ -35,10 +35,10 @@ class ASPPPooling3d(nn.Sequential):
             nn.ReLU(inplace=True))
 
     def forward(self, x):
-        size = x.shape[-2:]
+        size = x.shape[-3:]  # Spatial shape
         for mod in self:
             x = mod(x)
-        return F.interpolate(x, size=size, mode='bilinear', align_corners=False)
+        return F.interpolate(x, size=size, mode='trilinear', align_corners=False)
 
 
 class ASPP3d(nn.Module):
