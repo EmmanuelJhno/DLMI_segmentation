@@ -122,6 +122,7 @@ class FeedForwardSegmentation(BaseModel):
         self.loss_S = self.criterion(self.prediction, self.target)
 
     def get_segmentation_stats(self):
+        print('Predictions : ',self.prediction)
         self.seg_scores, self.dice_score = segmentation_stats(self.prediction, self.target)
         seg_stats = [('Overall_Acc', self.seg_scores['overall_acc']), ('Mean_IOU', self.seg_scores['mean_iou'])]
         for class_id in range(self.dice_score.size):

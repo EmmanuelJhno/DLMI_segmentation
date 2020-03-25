@@ -74,7 +74,7 @@ class LiTSDataset(data.Dataset):
     def __init__(self, root_dir, split, augment=None, 
                  physical_reference_size=(512,512,512),spacing = 2, 
                  aug_parameters=default_aug,
-                 bounding_box=default_bounding_box):
+                 bounding_box=default_bounding_box, no_tumor=False):
         """
         returns a dataset for the LiTS challenge.
         Args:
@@ -86,6 +86,7 @@ class LiTSDataset(data.Dataset):
         """
 
         super(LiTSDataset, self).__init__()
+        self.no_tumor = no_tumor
         self.augment = augment
         self.aug_parameters = aug_parameters
         self.bounding_box = bounding_box
@@ -118,6 +119,11 @@ class LiTSDataset(data.Dataset):
     def __getitem__(self, index):
         img = sitk.ReadImage(self.image_filenames[index])
         mask = sitk.ReadImage(self.mask_filenames[index])
+        if self.no_tumor:
+            mask = sitk.GetArrayFromImage(mask)
+            mask = np.clip(mask, a_min=0, a_max=1)
+            mask = sitk.GetImageFromArray(mask)
+            print('Unique mask values : ', np.unique(mask))
 
         transform = self.get_normalization_transform(img)
 
