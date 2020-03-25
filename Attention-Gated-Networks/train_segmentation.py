@@ -151,7 +151,10 @@ def train(arguments):
             print('{}_{} Average Errors : '.format(split, epoch), avg_errors)
             print('{}_{} Average Stats : '.format(split, epoch), avg_stats)
             print('-'*150)
-             
+
+                # Visualise predictions
+                visuals = model.get_current_visuals()
+                #visualizer.display_current_results(visuals, epoch=epoch, save_result=False)
 
         # Update the plots
         #for split in ['train', 'validation', 'test']:
@@ -165,8 +168,7 @@ def train(arguments):
 
         # Update the model learning rate
         model.update_learning_rate()
-    
-    
+
     writer.close()
 
 
