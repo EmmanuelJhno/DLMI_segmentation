@@ -171,7 +171,6 @@ def train(arguments):
 
     writer.close()
 
-
 if __name__ == '__main__':
     import argparse
 
