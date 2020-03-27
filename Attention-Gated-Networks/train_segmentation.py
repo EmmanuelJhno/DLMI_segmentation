@@ -45,9 +45,9 @@ def train(arguments):
     train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True)
     val_dataset = LiTSDataset(data_path, val, no_tumor=True)
     test_dataset = LiTSDataset(data_path, test, no_tumor=True)
-    train_loader = DataLoader(dataset=train_dataset, num_workers=16, batch_size=train_opts.batchSize, shuffle=True)
-    valid_loader = DataLoader(dataset=val_dataset, num_workers=16, batch_size=train_opts.batchSize, shuffle=False)
-    test_loader  = DataLoader(dataset=test_dataset,  num_workers=16, batch_size=train_opts.batchSize, shuffle=False)
+    train_loader = DataLoader(dataset=train_dataset, num_workers=8, batch_size=train_opts.batchSize, shuffle=True)
+    valid_loader = DataLoader(dataset=val_dataset, num_workers=8, batch_size=train_opts.batchSize, shuffle=False)
+    test_loader  = DataLoader(dataset=test_dataset,  num_workers=8, batch_size=train_opts.batchSize, shuffle=False)
 
     # Setup the NN Model
     model = get_model(json_opts.model)
