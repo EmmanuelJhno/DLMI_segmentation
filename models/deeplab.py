@@ -111,5 +111,6 @@ class DeepLab3D(nn.Module):
                           size=inputs.size()[2:],
                           mode="trilinear",
                           align_corners=True)
-        return x
+        pred = F.softmax(x, dim=1)
+        return pred
 
