@@ -66,7 +66,7 @@ class DeepLab3D(nn.Module):
             self.backbone = BACKBONES["mobilenet"](in_channels=config.in_channels,
                                                    **config.backbone_kwargs)
 
-        self.aspp = ASPP3d(in_channels=self.backbone.last_channel,
+        self.aspp = ASPP3d(in_channels=self.backbone.hlf_channels,
                            atrous_rates=self.atrous_rates)
 
         self.low_level_decoder = nn.Sequential(

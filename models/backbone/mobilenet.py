@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from models.backbone import Backbone
+from models.backbone.backbone import Backbone
 from models.blocks import Conv3dBNReLU, InvertedResidual
 from models.utils import _make_divisible
 
