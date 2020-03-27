@@ -7,7 +7,7 @@ from models.blocks.resnet import BasicBlock, conv1x1, conv3x3
 
 
 class ResNet3D18(Backbone):
-    def __init__(self, in_channels, layers,
+    def __init__(self, in_channels,
                  groups=1, width_per_group=64):
         """
         MobileNet V2 main class
@@ -15,7 +15,7 @@ class ResNet3D18(Backbone):
             in_channels (int): Number of input channels
         """
         super(ResNet3D18, self).__init__(in_channels=in_channels)
-
+        layers = [2, 2, 2, 2]
         self.inplanes = 64
 
         self.groups = groups
@@ -53,8 +53,7 @@ class ResNet3D18(Backbone):
                         base_width=self.base_width)]
         self.inplanes = channels * block.expansion
         for _ in range(1, blocks):
-            layers.append(block(self.inplanes, channels, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation))
+            layers.append(block(self.inplanes, channels, groups=self.groups, base_width=self.base_width))
 
         return nn.Sequential(*layers)
 

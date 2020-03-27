@@ -2,10 +2,10 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.backbone import MobileNet3d
+from models.backbone import MobileNet3d, ResNet3D18
 from models.blocks import ASPP3d, Conv3dBNReLU
 
-BACKBONES = {"mobilenet": MobileNet3d}
+BACKBONES = {"mobilenet": MobileNet3d, "resnet18": ResNet3D18}
 
 
 class DeepLab3D(nn.Module):
