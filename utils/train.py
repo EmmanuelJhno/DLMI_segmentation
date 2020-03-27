@@ -84,7 +84,9 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         ### depends on the shape of dice ( we want to do the mean of all the dice of each image)
         dice_epoch += 1 - loss 
             
-    dice_epoch = dice_epoch/len(data_loader)        
+    dice_epoch = dice_epoch/len(data_loader)
+    print('epoch : {0} train_loss : {1} | train_dice : {2}'.format(epoch, avg_loss, dice_epoch))
+
     writer.add_scalar('train_epoch_loss', avg_loss, epoch)
     writer.add_scalar('train_epoch_dice', dice_epoch, epoch)
     
