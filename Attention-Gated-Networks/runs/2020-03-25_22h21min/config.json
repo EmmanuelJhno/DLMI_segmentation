@@ -1,1 +1,0 @@
-[["LiTS", 100, 10, "step", 250, 2, true], [8099, true, 256, 1, 0], ["/home/raubyb/LiTS"], [[[0.1, 0.1], 15.0, [0.7, 1.3], [1.0, 1.0], 0.5, [160, 160, 96], [160, 160, 96]]], ["seg", false, -1, "deeplab_mobilenet3d", "3D", 16, 1, 2, 0.0001, 1e-06, 4, [0], true, "./checkpoints", "experiment_deeplab_LiTS", "dice_loss"]]
