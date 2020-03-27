@@ -41,8 +41,6 @@ This should be differentiable.
     smooth = 1.
 
     # have to use contiguous since they may from a torch.view op
-    print(pred.shape)
-    print(target.shape)
     iflat = pred.contiguous()
     tflat = target.contiguous()
     intersection = (iflat * tflat).sum(dim=(2,3,4))
@@ -66,7 +64,6 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         output = model(data)
         #### Check dimension of the loss sould be bsx1 for later averaging
         batch_loss = dice_loss(output, target)
-        print(batch_loss)
         loss = torch.mean(batch_loss[:,1])
         loss.backward()
         optimizer.step()
@@ -87,7 +84,7 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         ### depends on the shape of dice ( we want to do the mean of all the dice of each image)
         dice_epoch += 1 - loss 
             
-    dice_epoch = dice_epoch/len(data_loadr)        
+    dice_epoch = dice_epoch/len(data_loader)        
     writer.add_scalar('train_epoch_loss', avg_loss, epoch)
     writer.add_scalar('train_epoch_dice', dice_epoch, epoch)
     
@@ -110,7 +107,6 @@ def evaluate(config, model, data_loader, device, epoch, writer):
             output = model(data)
             batch_loss = dice_loss(output, target)
             batch_dice_loss = torch.mean(batch_loss[:,1])
-            batch_dice_loss = dice_loss(output, target)
             validation_loss += batch_dice_loss  
             validation_dice += 1 - batch_dice_loss
             
@@ -121,7 +117,7 @@ def evaluate(config, model, data_loader, device, epoch, writer):
         eval_score = {}
         eval_score['val_loss'], eval_score['validation_dice'] = val_loss, validation_dice
         #print('epoch : {} val_loss : {} , top1_acc {},  top3_acc {}'.format(epoch, val_loss, top1_acc, top3_acc))
-        print('epoch : {0} val_loss : {1} | dice {2}'.format(epoch, val_loss, dice))
+        print('epoch : {0} val_loss : {1} | dice {2}'.format(epoch, val_loss, validation_dice))
     return writer, eval_score
             
             
@@ -215,7 +211,7 @@ def main(raw_args=None):
     val_dataset = LiTSDataset(data_path, val, no_tumor=True)
     test_dataset = LiTSDataset(data_path, test, no_tumor=True)
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=True)
-    valid_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
+    val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
     test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
     # Compute on gpu or cpu
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
