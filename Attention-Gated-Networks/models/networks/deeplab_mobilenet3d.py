@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from models.networks_other import init_weights
 
 
-class _MobileNet3d(nn.Module):
+class MobileNet3D(nn.Module):
     def __init__(self,
                  in_channels=3,
                  width_mult=1.0,
@@ -23,7 +23,7 @@ class _MobileNet3d(nn.Module):
             Set to 1 to turn off rounding
             block: Module specifying inverted residual building block for mobilenet3d
         """
-        super(_MobileNet3d, self).__init__()
+        super(MobileNet3D, self).__init__()
 
         if block is None:
             block = InvertedResidual
@@ -90,14 +90,14 @@ class deeplab_mobilenet3d(nn.Module):
         self.width_mult = width_mult
 
         # Feature extraction through MobileNet
-        self.mobilenet = _MobileNet3d(width_mult=width_mult, in_channels=in_channels)
+        self.backbone = MobileNet3D(width_mult=width_mult, in_channels=in_channels)
 
         # A-trou Spatial Pyramid Pooling
-        self.aspp = ASPP3d(in_channels=self.mobilenet.last_channel,
+        self.aspp = ASPP3d(in_channels=self.backbone.last_channel,
                            atrous_rates=self.atrous_rates)
 
         # Low-level features decoder
-        self.low_conv = Conv3dBNReLU(in_channels=self.mobilenet.low_level_feats_channels,
+        self.low_conv = Conv3dBNReLU(in_channels=self.backbone.low_level_feats_channels,
                                      out_channels=self.aspp.last_channel,
                                      kernel_size=1)
 
@@ -124,7 +124,7 @@ class deeplab_mobilenet3d(nn.Module):
                 init_weights(m, init_type='kaiming')
 
     def forward(self, inputs):
-        high_level_feats, low_level_feats = self.mobilenet(inputs)
+        high_level_feats, low_level_feats = self.backbone(inputs)
 
         # ASPP and upsampling
         aspp = self.aspp(high_level_feats)
