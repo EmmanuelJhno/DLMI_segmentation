@@ -16,7 +16,6 @@ class Unet3D(nn.Module):
                 feature_scale (int, optional): factor by which to scale down the number of filters / channels in each block;
                 is_deconv (bool, optional): whether to use DeConvolutions;
                 is_batchnorm (bool, optional): whether to use Batch Normalization;
-            loss_type (str)
 
         Attributes:
             num_classes (int): Number of classes in the output mask
@@ -24,10 +23,9 @@ class Unet3D(nn.Module):
             is_batchnorm (bool)
             is_deconv (bool)
             feature_scale (int)
-            loss_type (str, optional)
         """
 
-    def __init__(self, config, loss_type=None):
+    def __init__(self, config):
         super(Unet3D, self).__init__()
         assert hasattr(config, "num_classes")
         assert hasattr(config, "in_channels")
@@ -46,7 +44,6 @@ class Unet3D(nn.Module):
 
         self.num_classes = config.num_classes
         self.in_channels = config.in_channels
-        self.loss_type = loss_type
 
         self.is_deconv = config.is_deconv
         self.is_batchnorm = config.is_batchnorm
@@ -112,14 +109,12 @@ class Unet3D(nn.Module):
         up1 = self.up_concat1(conv1, up2)
 
         final = self.final(up1)
+        pred = F.softmax(final, dim=1)
+        return pred
 
-        if self.loss_type is None:
-            return final
-        else:
-            raise NotImplementedError('Unknow loss type')
 
-    @staticmethod
-    def apply_argmax_softmax(pred):
-        log_p = F.softmax(pred, dim=1)
+#     @staticmethod
+#     def apply_argmax_softmax(pred):
+#         log_p = F.softmax(pred, dim=1)
 
-        return log_p
+#         return log_p

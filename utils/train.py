@@ -13,13 +13,14 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
-from data_loader import setup_dataset
+from data_loader.LiTS import LiTSDataset
 from models import get_model
-from utils.utilities import ObjFromDict
+# from utils.utilities import ObjFromDict
 
 class ObjFromDict:
     def __init__(self, d):
@@ -30,39 +31,43 @@ class ObjFromDict:
                 setattr(self, a, ObjFromDict(b) if isinstance(b, dict) else b)
                 
                 
-def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer, freq_print=10000, metrics=['fieldguide_score','accuracy']):
+def dice_loss(pred, target):
+    """This definition generalize to real valued pred and target vector.
+This should be differentiable.
+    pred: tensor with first dimension as batch
+    target: tensor with first dimension as batch
+    """
+
+    smooth = 1.
+
+    # have to use contiguous since they may from a torch.view op
+    iflat = pred.contiguous()
+    tflat = target.contiguous()
+    intersection = (iflat * tflat).sum(dim=(2,3,4))
+
+    A_sum = torch.sum(tflat * iflat, dim=(2,3,4))
+    B_sum = torch.sum(tflat * tflat , dim=(2,3,4))
+    
+    return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth) )                
+                
+                
+def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer, freq_print=10000):
     model.train()
     avg_loss = 0
-    correct = correct_top3 = 0
-    top1_epoch_acc = top3_epoch_acc = 0
+    dice_epoch = 0
     
-    if config.training.loss.type == 'geometric':
-        lambda_ = config.training.loss.coef
-        target_embedding = torch.zeros((config.model.num_classes, model.classifier.in_features)).to(device)
         
     for batch_idx, (data, target) in enumerate(data_loader):
-        data, target = data.to(device), (target['label']).to(device)
+        data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-        
-        if config.training.loss.type == 'geometric': 
-            output, embedding = model(data)
-            if epoch > 0 : 
-                mask = torch.ones(config.training.batch_size,model.classifier.out_features).to(device).long().scatter_(1, target.view(config.training.batch_size,1), torch.tensor(-1).float().to(device)).detach()
-                representation_loss = torch.mean(torch.sum(mask * torch.sum((embedding.view(config.training.batch_size,1,model.classifier.in_features) - target_embedding.view(1,model.classifier.out_features, model.classifier.in_features))**2, dim = -1), dim = -1))
-                representation_loss = representation_loss / (model.classifier.out_features * model.classifier.in_features *config.training.batch_size)
-                loss = (1 - lambda_) * F.cross_entropy(output, target) + lambda_ * representation_loss
-            else:
-                loss = F.cross_entropy(output, target)
-        else:
-            output = model(data)
-            loss = F.cross_entropy(output, target)
-        
+
+        output = model(data)
+        #### Check dimension of the loss sould be bsx1 for later averaging
+        batch_loss = dice_loss(output, target)
+        loss = torch.mean(batch_loss[:,1])
         loss.backward()
         optimizer.step()
-        
-        if config.training.loss.type == 'geometric_loss':
-            target_embedding[target] = (1-momentum) * target_embedding[target] + momentum * torch.squeeze(embedding)
-            target_embedding = target_embedding.detach()
+    
             
         if avg_loss == 0 : 
             avg_loss = loss.item()
@@ -71,72 +76,48 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tavg Loss: {:.6f}\t Loss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(data_loader.dataset),
                 100. * batch_idx / len(data_loader), avg_loss, loss.item()))
-            if epoch> 0 : print(representation_loss)
-        for metric in metrics:
-            if metric=='fieldguide_score': 
-                prob_pred_top3, class_pred_top3 = torch.topk(output, 3, dim=1, largest=True, sorted=True, out=None) 
-                for idx in range(len(target)):
-                    if target[idx] in class_pred_top3[idx]:
-                        correct_top3 += 1
-            else :
-                pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-                correct += pred.eq(target.view_as(pred)).sum().item()
 
-        top1_batch_acc = correct/len(data)
-        top3_batch_acc = correct_top3/len(data)
 
-        writer.add_scalar('train_batch_loss', avg_loss, epoch)
-        writer.add_scalar('train_batch_acc_top1', top1_batch_acc, epoch)
-        writer.add_scalar('train_batch_acc_top3', top3_batch_acc, epoch)
 
-        top1_epoch_acc += top1_batch_acc
-        top3_epoch_acc += top3_batch_acc
+        writer.add_scalar('train_batch_loss', avg_loss, batch_idx +len(data_loader) * epoch)
+
+        ### depends on the shape of dice ( we want to do the mean of all the dice of each image)
+        dice_epoch += 1 - loss 
             
-            
+    dice_epoch = dice_epoch/len(data_loader)        
     writer.add_scalar('train_epoch_loss', avg_loss, epoch)
-    writer.add_scalar('train_epoch_acc_top1', top1_epoch_acc/(data_loader.batch_size * len(data_loader.dataset)), epoch)
-    writer.add_scalar('train_epoch_acc_top3', top3_epoch_acc/(data_loader.batch_size * len(data_loader)), epoch)
+    writer.add_scalar('train_epoch_dice', dice_epoch, epoch)
     
     return writer
     
             
-def evaluate(config, model, data_loader, device, epoch, writer, loss_function=F.cross_entropy, metrics=['fieldguide_score','accuracy']):
+def evaluate(config, model, data_loader, device, epoch, writer):
     model.eval()
     with torch.no_grad():
         validation_loss = 0
-        correct = 0
-        correct_top3 = 0
+        validation_dice = 0
+        
         for batch_idx, (data, target) in enumerate(data_loader):
-            if batch_idx==0:
-                # Record some of the images
-                grid = torchvision.utils.make_grid(data.cpu())
-                writer.add_image('images', grid, 0)
+#             if batch_idx==0:
+#                 # Record some of the images
+#                 grid = torchvision.utils.make_grid(data.cpu())
+#                 writer.add_image('images', grid, 0)
             # Compute the scores
-            data, target = data.to(device), (target['label']).to(device)
-            if config.training.loss.type == 'geometric':
-                output,_ = model(data)
-            else:
-                output = model(data)
-            validation_loss += loss_function(output, target).item()  # sum up batch loss
-            for metric in metrics:
-                if metric=='fieldguide_score': 
-                    prob_pred_top3, class_pred_top3 = torch.topk(output, 3, dim=1, largest=True, sorted=True, out=None) 
-                    for idx in range(len(target)):
-                        if target[idx] in class_pred_top3[idx]:
-                            correct_top3 += 1
-                else :
-                    pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-                    correct += pred.eq(target.view_as(pred)).sum().item()
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            batch_loss = dice_loss(output, target)
+            batch_dice_loss = torch.mean(batch_loss[:,1])
+            validation_loss += batch_dice_loss  
+            validation_dice += 1 - batch_dice_loss
+            
         val_loss = validation_loss/len(data_loader)
-        top1_acc = correct/len(data_loader.dataset)
-        top3_acc = correct_top3/len(data_loader.dataset)
+        validation_dice = validation_dice/len(data_loader)
         writer.add_scalar('val_epoch_loss', val_loss, epoch)
-        writer.add_scalar('val_epoch_acc_top1', top1_acc, epoch)
-        writer.add_scalar('val_epoch_acc_top3', top3_acc, epoch)
+        writer.add_scalar('val_epoch_dice', validation_dice, epoch)
         eval_score = {}
-        eval_score['fieldguide_score'], eval_score['accuracy'] = top3_acc, top1_acc
+        eval_score['val_loss'], eval_score['validation_dice'] = val_loss, validation_dice
         #print('epoch : {} val_loss : {} , top1_acc {},  top3_acc {}'.format(epoch, val_loss, top1_acc, top3_acc))
-        print('epoch : {0} val_loss : {1} | top1_correct {2}/{3} -> top1_acc {4} | top3_correct {5}/{3} -> top3_acc {6}'.format(epoch, val_loss, correct, len(data_loader.dataset), top1_acc, correct_top3, top3_acc))
+        print('epoch : {0} val_loss : {1} | dice {2}'.format(epoch, val_loss, validation_dice))
     return writer, eval_score
             
             
@@ -203,15 +184,39 @@ def main(raw_args=None):
     ### Get the parameters according to the configuration
     config = ObjFromDict(config)
     
-    model = get_model(config.model, config.training.loss.type)
-    train_dataloader, val_dataloader = setup_dataset(config, debug=args.debug)
+    model = get_model(config.model)
+    
+    data_path = config.dataset.root
+    print('data_path ', data_path)
+    
+    # fix the seed for the split
+    split_seed = 0 
+    np.random.seed(split_seed)
+    
+    image_dir = os.listdir(os.path.join(data_path,'Training Batch 1')) + os.listdir(os.path.join(data_path,'Training Batch 2'))
+    all_indexes = [ int(file_name[7:-4]) for file_name in image_dir if 'volume' in file_name]
+    split = np.random.permutation(all_indexes)
+    n_train, n_val, n_test = int(0.8 * len(split)), int(0.1 * len(split)), int(0.1 * len(split))
+    
+    train = split[: n_train]
+    val = split[n_train : n_train+n_val]
+    test = split[n_train + n_val :]
+    
+    # reset the previous seed
+    torch.manual_seed(args.seed) # the seed for every torch calculus
+    np.random.seed(args.seed)
+    
+    # Setup Data Loader
+    train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True)
+    val_dataset = LiTSDataset(data_path, val, no_tumor=True)
+    test_dataset = LiTSDataset(data_path, test, no_tumor=True)
+    train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=True)
+    val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
+    test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
     # Compute on gpu or cpu
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
-    
-    ### Set the variables
-    # loss function : Doesn't depend on the model right ?
-    loss_function = F.cross_entropy
+
     # trainable parameters
     params = [p for p in model.parameters() if p.requires_grad]
     # optimizer and learning rate
@@ -223,19 +228,17 @@ def main(raw_args=None):
     # tensorboard logs
     writer = SummaryWriter(log_path)
     best_scores = {}
-    metrics = ['fieldguide_score','accuracy']
-    for metric in metrics : 
-        best_scores[metric] = -1
+    best_scores['validation_dice'] = -1
     #-----------------------------------------------------------------------------------------
     ### Now, we can run the training
     for epoch in range(config.training.epochs):
-        writer = train_one_epoch(config, model, optimizer, train_dataloader, device, epoch, writer, freq_print=10000, metrics=metrics)
-        writer, eval_score = evaluate(config, model, val_dataloader, device, epoch, writer, metrics=metrics)
+        writer = train_one_epoch(config, model, optimizer, train_dataloader, device, epoch, writer, freq_print=10000)
+        writer, eval_score = evaluate(config, model, val_dataloader, device, epoch, writer)
         lr_scheduler.step()
-        for metric in metrics: 
-            if eval_score[metric] > best_scores[metric]: 
-                torch.save(model.state_dict(), os.path.join(log_path,'best_{}.pth'.format(metric)))
-                best_scores[metric] = eval_score[metric]
+
+        if eval_score['validation_dice'] > best_scores['validation_dice']: 
+            torch.save(model.state_dict(), os.path.join(log_path,'best_{}.pth'.format('validation_dice')))
+            best_scores['validation_dice'] = eval_score['validation_dice']
          
     writer.close()
     
