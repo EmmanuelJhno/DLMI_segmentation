@@ -57,16 +57,16 @@ class Unet3D(nn.Module):
 
         # downsampling
         self.conv1 = UnetConv3(self.in_channels, filters[0], self.is_batchnorm)
-        self.maxpool1 = nn.MaxPool3d(kernel_size=(2, 2, 1))
+        self.maxpool1 = nn.MaxPool3d(kernel_size=(2, 2, 2))
 
         self.conv2 = UnetConv3(filters[0], filters[1], self.is_batchnorm)
-        self.maxpool2 = nn.MaxPool3d(kernel_size=(2, 2, 1))
+        self.maxpool2 = nn.MaxPool3d(kernel_size=(2, 2, 2))
 
         self.conv3 = UnetConv3(filters[1], filters[2], self.is_batchnorm)
-        self.maxpool3 = nn.MaxPool3d(kernel_size=(2, 2, 1))
+        self.maxpool3 = nn.MaxPool3d(kernel_size=(2, 2, 2))
 
         self.conv4 = UnetConv3(filters[2], filters[3], self.is_batchnorm)
-        self.maxpool4 = nn.MaxPool3d(kernel_size=(2, 2, 1))
+        self.maxpool4 = nn.MaxPool3d(kernel_size=(2, 2, 2))
 
         self.center = UnetConv3(filters[3], filters[4], self.is_batchnorm)
 
