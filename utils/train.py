@@ -13,13 +13,14 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
 
-from data_loader import LiTSDataset
+from data_loader.LiTS import LiTSDataset
 from models import get_model
-from utils.utilities import ObjFromDict
+# from utils.utilities import ObjFromDict
 
 class ObjFromDict:
     def __init__(self, d):
@@ -40,12 +41,14 @@ This should be differentiable.
     smooth = 1.
 
     # have to use contiguous since they may from a torch.view op
-    iflat = pred.contiguous().view(-1)
-    tflat = target.contiguous().view(-1)
-    intersection = (iflat * tflat).sum()
+    print(pred.shape)
+    print(target.shape)
+    iflat = pred.contiguous()
+    tflat = target.contiguous()
+    intersection = (iflat * tflat).sum(dim=(2,3,4))
 
-    A_sum = torch.sum(tflat * iflat)
-    B_sum = torch.sum(tflat * tflat)
+    A_sum = torch.sum(tflat * iflat, dim=(2,3,4))
+    B_sum = torch.sum(tflat * tflat , dim=(2,3,4))
     
     return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth) )                
                 
@@ -53,7 +56,7 @@ This should be differentiable.
 def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer, freq_print=10000):
     model.train()
     avg_loss = 0
-    dice = 0
+    dice_epoch = 0
     
         
     for batch_idx, (data, target) in enumerate(data_loader):
@@ -62,8 +65,9 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
 
         output = model(data)
         #### Check dimension of the loss sould be bsx1 for later averaging
-        loss = dice(output, target)
-        
+        batch_loss = dice_loss(output, target)
+        print(batch_loss)
+        loss = torch.mean(batch_loss[:,1])
         loss.backward()
         optimizer.step()
     
@@ -81,11 +85,11 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         writer.add_scalar('train_batch_loss', avg_loss, batch_idx +len(data_loader) * epoch)
 
         ### depends on the shape of dice ( we want to do the mean of all the dice of each image)
-        dice += 1 - loss 
+        dice_epoch += 1 - loss 
             
-    dice = np.mean(dice)        
+    dice_epoch = dice_epoch/len(data_loadr)        
     writer.add_scalar('train_epoch_loss', avg_loss, epoch)
-    writer.add_scalar('train_epoch_dice', dice, epoch)
+    writer.add_scalar('train_epoch_dice', dice_epoch, epoch)
     
     return writer
     
@@ -104,9 +108,11 @@ def evaluate(config, model, data_loader, device, epoch, writer):
             # Compute the scores
             data, target = data.to(device), target.to(device)
             output = model(data)
-            dice_loss = dice(output, target)
-            validation_loss += dice_loss  
-            validation_dice += 1 - dice_loss
+            batch_loss = dice_loss(output, target)
+            batch_dice_loss = torch.mean(batch_loss[:,1])
+            batch_dice_loss = dice_loss(output, target)
+            validation_loss += batch_dice_loss  
+            validation_dice += 1 - batch_dice_loss
             
         val_loss = validation_loss/len(data_loader)
         validation_dice = validation_dice/len(data_loader)
@@ -182,9 +188,9 @@ def main(raw_args=None):
     ### Get the parameters according to the configuration
     config = ObjFromDict(config)
     
-    model = get_model(config.model, config.training.loss.type)
+    model = get_model(config.model)
     
-    data_path = config.data_path
+    data_path = config.dataset.root
     print('data_path ', data_path)
     
     # fix the seed for the split
@@ -208,9 +214,9 @@ def main(raw_args=None):
     train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True)
     val_dataset = LiTSDataset(data_path, val, no_tumor=True)
     test_dataset = LiTSDataset(data_path, test, no_tumor=True)
-    train_loader = DataLoader(dataset=train_dataset, num_workers=8, batch_size=train_opts.batchSize, shuffle=True)
-    valid_loader = DataLoader(dataset=val_dataset, num_workers=8, batch_size=train_opts.batchSize, shuffle=False)
-    test_loader  = DataLoader(dataset=test_dataset,  num_workers=8, batch_size=train_opts.batchSize, shuffle=False)
+    train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=True)
+    valid_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
+    test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
     # Compute on gpu or cpu
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
@@ -226,8 +232,7 @@ def main(raw_args=None):
     # tensorboard logs
     writer = SummaryWriter(log_path)
     best_scores = {}
-    for metric in metrics : 
-        best_scores[metric] = -1
+    best_scores['validation_dice'] = -1
     #-----------------------------------------------------------------------------------------
     ### Now, we can run the training
     for epoch in range(config.training.epochs):
@@ -237,7 +242,7 @@ def main(raw_args=None):
 
         if eval_score['validation_dice'] > best_scores['validation_dice']: 
             torch.save(model.state_dict(), os.path.join(log_path,'best_{}.pth'.format('validation_dice')))
-            best_scores[metric] = eval_score[metric]
+            best_scores['validation_dice'] = eval_score['validation_dice']
          
     writer.close()
     

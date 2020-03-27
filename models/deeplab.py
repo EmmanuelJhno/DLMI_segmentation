@@ -18,7 +18,6 @@ class DeepLab3D(nn.Module):
             in_channels (int): Number of channels in the input image;
             backbone (str, optional): the backbone to use. e.g. "mobilenet";
             backbone_kwargs (dict, optional): keyword args to pass to the backbone constructor
-        loss_type (str)
 
     Attributes:
         num_classes (int): Number of classes in the output mask
@@ -31,10 +30,9 @@ class DeepLab3D(nn.Module):
         low_level_decoder (nn.Sequential): Convolutional decoder for low-level features
         decoder (nn.Sequential): Convolutional decoder for the concatenated decoded low-level features
             and the ASPP features
-        loss_type (str, optional)
     """
 
-    def __init__(self, config, loss_type = None):
+    def __init__(self, config):
         super(DeepLab3D, self).__init__()
         assert hasattr(config, "num_classes")
         assert hasattr(config, "in_channels")
@@ -46,7 +44,6 @@ class DeepLab3D(nn.Module):
         self.num_classes = config.num_classes
         self.in_channels = config.in_channels
         self.atrous_rates = config.atrous_rates
-        self.loss_type = loss_type
 
         if hasattr(config, "backbone"):
             backbone_name = config.backbone
@@ -114,8 +111,5 @@ class DeepLab3D(nn.Module):
                           size=inputs.size()[2:],
                           mode="trilinear",
                           align_corners=True)
+        return x
 
-        if self.loss_type is None:
-            return x
-        else:
-            raise NotImplementedError('Unknow loss type')

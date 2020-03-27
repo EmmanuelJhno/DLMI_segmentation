@@ -4,7 +4,7 @@ import os
 import SimpleITK as sitk
 import numpy as np
 import torch.utils.data as data
-
+import torch
 
 def eul2quat(ax, ay, az, atol=1e-8):
     '''
@@ -74,7 +74,7 @@ class LiTSDataset(data.Dataset):
     def __init__(self, root_dir, split, augment=None, 
                  physical_reference_size=(512,512,512),spacing = 2, 
                  aug_parameters=default_aug,
-                 bounding_box=default_bounding_box, no_tumor=False):
+                 bounding_box=default_bounding_box, no_tumor=True):
         """
         returns a dataset for the LiTS challenge.
         Args:
@@ -119,11 +119,6 @@ class LiTSDataset(data.Dataset):
     def __getitem__(self, index):
         img = sitk.ReadImage(self.image_filenames[index])
         mask = sitk.ReadImage(self.mask_filenames[index])
-        if self.no_tumor:
-            mask = sitk.GetArrayFromImage(mask)
-            mask = np.clip(mask, a_min=0, a_max=1)
-            mask = sitk.GetImageFromArray(mask)
-            print('Unique mask values : ', np.unique(mask))
 
         transform = self.get_normalization_transform(img)
 
@@ -145,14 +140,32 @@ class LiTSDataset(data.Dataset):
         # return input, target
         input = sitk.GetArrayFromImage(input)
         target = sitk.GetArrayFromImage(target)
-        input = np.expand_dims(input, axis=0)
-        target = np.expand_dims(target, axis=0)
+        if self.no_tumor:
+            target = np.clip(target, a_min=0, a_max=1)
+        
+ 
         ax_1, ax_2, ax_3 = self.physical_reference_size
         bb = np.array([ax_1, ax_1, ax_2, ax_2, ax_3, ax_3])
         bb = self.bounding_box * bb / self.spacing
         bb = bb.astype('int')
-        return(input.astype('float32')[:,bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]], 
-               target.astype('int')[:,bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]])
+        input = input.astype('float32')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
+        target = target.astype('int')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
+        
+        one_hot_target = np.zeros(target.shape + (target.max()+1,))
+        
+
+        target = np.expand_dims(target,axis=-1)
+        if self.no_tumor:
+            num_class = 2
+        else : 
+            num_class = 3
+            
+        one_hot_target = (torch.from_numpy(target) == torch.arange(num_class).reshape(1, num_class)).int()
+        
+        input = torch.from_numpy(np.expand_dims(input,axis=0)) # we add the channel dimension
+        
+        one_hot_target = one_hot_target.permute(3,0,1,2)
+        return input, one_hot_target
 
     def set_reference_space(self):
         img = sitk.ReadImage(self.image_filenames[0])
