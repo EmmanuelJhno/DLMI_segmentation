@@ -1,0 +1,30 @@
+{
+"model" : {
+    "name" : "attention_unet",
+    "num_classes": 2,
+    "in_channels": 1,
+    "is_batchnorm": true,
+    "is_deconv": true
+    },
+    
+"optimizer" : {
+    "learning_rate" : 5e-3,
+    "weight_decay" : 0,
+    "lr_scheduler" : {
+        "step_size" : 10,
+        "gamma" : 0.1
+        }
+    },
+    
+    
+ "dataset" : {
+     "name" : "LiTS",
+     "root" : "/home/raubyb/LiTS"
+     },
+     
+ "training" : {
+     "batch_size" : 4,
+     "epochs" : 30,
+     "class_weights_alpha" : 1
+    }
+}
