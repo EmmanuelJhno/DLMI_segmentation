@@ -199,7 +199,7 @@ def main(raw_args=None):
     val = split[n_train : n_train+n_val]
     test = split[n_train + n_val :]
 
-    with open(os.path.join(log_path,' splits.json'), 'w+') as file:
+    with open(os.path.join(log_path,'splits.json'), 'w+') as file:
         json.dump({
             "train": train.tolist(),
             "val": val.tolist(),
