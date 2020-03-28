@@ -81,7 +81,6 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
 
         writer.add_scalar('train_batch_loss', avg_loss, batch_idx +len(data_loader) * epoch)
 
-        ### depends on the shape of dice ( we want to do the mean of all the dice of each image)
         dice_epoch += 1 - loss 
             
     dice_epoch = dice_epoch/len(data_loader)
@@ -100,10 +99,6 @@ def evaluate(config, model, data_loader, device, epoch, writer):
         validation_dice = 0
         
         for batch_idx, (data, target) in enumerate(data_loader):
-#             if batch_idx==0:
-#                 # Record some of the images
-#                 grid = torchvision.utils.make_grid(data.cpu())
-#                 writer.add_image('images', grid, 0)
             # Compute the scores
             data, target = data.to(device), target.to(device)
             output = model(data)
@@ -209,9 +204,15 @@ def main(raw_args=None):
     np.random.seed(args.seed)
     
     # Setup Data Loader
-    train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True)
-    val_dataset = LiTSDataset(data_path, val, no_tumor=True)
-    test_dataset = LiTSDataset(data_path, test, no_tumor=True)
+    if args.debug: 
+        train_dataset = LiTSDataset(data_path, train[:1], augment=False, no_tumor=True)
+        val_dataset = LiTSDataset(data_path, train[:1], no_tumor=True)
+        test_dataset = LiTSDataset(data_path, train[:1], no_tumor=True)
+    else :
+        train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True)
+        val_dataset = LiTSDataset(data_path, val, no_tumor=True)
+        test_dataset = LiTSDataset(data_path, test, no_tumor=True)
+    
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
     test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
@@ -222,8 +223,8 @@ def main(raw_args=None):
     # trainable parameters
     params = [p for p in model.parameters() if p.requires_grad]
     # optimizer and learning rate
-    optimizer = torch.optim.Adam(params, lr=10**(-config.optimizer.learning_rate), 
-                                 weight_decay=10**(-config.optimizer.weight_decay))
+    optimizer = torch.optim.Adam(params, lr=config.optimizer.learning_rate, 
+                                 weight_decay=config.optimizer.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                    step_size=config.optimizer.lr_scheduler.step_size,
                                                    gamma=config.optimizer.lr_scheduler.gamma)
