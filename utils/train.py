@@ -198,6 +198,13 @@ def main(raw_args=None):
     train = split[: n_train]
     val = split[n_train : n_train+n_val]
     test = split[n_train + n_val :]
+
+    with open(os.path.join(log_path,' splits.json'), 'w+') as file:
+        json.dump({
+            "train": train,
+            "val": val,
+            "test": test
+        }, file)
     
     # reset the previous seed
     torch.manual_seed(args.seed) # the seed for every torch calculus
