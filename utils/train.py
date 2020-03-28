@@ -213,9 +213,12 @@ def main(raw_args=None):
         val_dataset = LiTSDataset(data_path, val, no_tumor=True)
         test_dataset = LiTSDataset(data_path, test, no_tumor=True)
     
-    train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=True)
-    val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
-    test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
+    train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers,
+                                  batch_size=config.training.batch_size, shuffle=True)
+    val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers,
+                                batch_size=config.training.batch_size, shuffle=False)
+    test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers,
+                                  batch_size=config.training.batch_size, shuffle=False)
     # Compute on gpu or cpu
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
@@ -242,6 +245,8 @@ def main(raw_args=None):
         if eval_score['validation_dice'] > best_scores['validation_dice']: 
             torch.save(model.state_dict(), os.path.join(log_path,'best_{}.pth'.format('validation_dice')))
             best_scores['validation_dice'] = eval_score['validation_dice']
+        elif epoch % 3 == 0 or epoch == config.training.epochs - 1:
+            torch.save(model.state_dict(), os.path.join(log_path, 'epoch_{}.pth'.format(epoch)))
          
     writer.close()
     
