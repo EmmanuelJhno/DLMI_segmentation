@@ -44,8 +44,8 @@ class ResNet3D(Backbone):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
-        self.llf_channels = 128*BasicBlock.expansion
-        self.hlf_channels = 512*BasicBlock.expansion
+        self.llf_channels = 128*block.expansion
+        self.hlf_channels = 512*block.expansion
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
