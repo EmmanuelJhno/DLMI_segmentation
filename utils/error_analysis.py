@@ -6,6 +6,7 @@ import copy
 import argparse
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import SimpleITK as sitk
 import tqdm
 import pandas as pd 
 from PIL import Image
@@ -13,15 +14,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
 from torchvision import transforms
-
+from torch.utils.data import DataLoader
 from models import get_model
-from data_loader import setup_dataset
+from data_loader.LiTS import LiTSDataset
 from utils.train import ObjFromDict
 
-def load_model(run_dir, metric): 
+
+def load_model(run_dir, metric='validation_dice'): 
     with open(os.path.join(run_dir,'config.json')) as json_file:
         config = json.load(json_file)
     config = ObjFromDict(config)

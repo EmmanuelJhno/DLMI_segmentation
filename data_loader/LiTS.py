@@ -159,7 +159,7 @@ class LiTSDataset(data.Dataset):
         one_hot_target = None
         if os.path.exists(self.mask_filenames[index]):
             mask = sitk.ReadImage(self.mask_filenames[index])
-            target = sitk.Resample(mask, self.reference_image, transform)
+            target = sitk.Resample(mask, self.reference_image, transform, sitk.sitkNearestNeighbor)
             target = sitk.GetArrayFromImage(target)
             if self.no_tumor:
                 target = np.clip(target, a_min=0, a_max=1)
