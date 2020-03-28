@@ -62,10 +62,10 @@ def iou(pred, target):
         torch.Tensor: IoU score for each sample in the batch
     """
     smooth = 1.
-    pred = pred[:, 1, :, :, :]
-    target = target[:, 1, :, :]
-    intersection = (pred & target).float().sum(dim=(2, 3, 4))
-    union = (pred | target).float().sum(dim=(2, 3, 4))
+    pred = pred[:, 1, :, :, :].int()
+    target = target[:, 1, :, :].int()
+    intersection = (pred & target).float().sum(dim=(1, 2, 3))
+    union = (pred | target).float().sum(dim=(1, 2, 3))
     return (intersection + smooth) / (union + smooth)
 
                 
