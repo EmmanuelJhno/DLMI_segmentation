@@ -24,7 +24,7 @@
      
  "training" : {
      "batch_size" : 4,
-     "epochs" : 30,
+     "epochs" : 20,
      "class_weights_alpha" : 1
     }
 }

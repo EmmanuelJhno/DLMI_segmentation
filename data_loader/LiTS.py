@@ -114,8 +114,6 @@ class LiTSDataset(data.Dataset):
 
         self.set_reference_space()
 
-
-
     def __getitem__(self, index):
         img = sitk.ReadImage(self.image_filenames[index])
         mask = sitk.ReadImage(self.mask_filenames[index])
@@ -149,6 +147,8 @@ class LiTSDataset(data.Dataset):
         bb = self.bounding_box * bb / self.spacing
         bb = bb.astype('int')
         input = input.astype('float32')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
+        input = np.clip(input, -200., 250.)
+        input /= np.linalg.norm(input)
         target = target.astype('int')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
         
         one_hot_target = np.zeros(target.shape + (target.max()+1,))

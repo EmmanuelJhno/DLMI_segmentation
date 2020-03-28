@@ -2,10 +2,15 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.backbone import MobileNet3d, ResNet3D18
+from models.backbone import MobileNet3d, ResNet3D
 from models.blocks import ASPP3d, Conv3dBNReLU
 
-BACKBONES = {"mobilenet": MobileNet3d, "resnet18": ResNet3D18}
+BACKBONES = {"mobilenet": (MobileNet3d, {}),
+             "resnet18": (ResNet3D, {"depth": 18}),
+             "resnet34": (ResNet3D, {"depth": 34}),
+             "resnet50": (ResNet3D, {"depth": 50}),
+             "resnet101": (ResNet3D, {"depth": 101}),
+             }
 
 
 class DeepLab3D(nn.Module):
@@ -56,12 +61,15 @@ class DeepLab3D(nn.Module):
         self.backbone_name = backbone_name
 
         if self.backbone_name in BACKBONES:
-            self.backbone = BACKBONES[self.backbone_name](in_channels=config.in_channels,
-                                                          **config.backbone_kwargs)
+            backbone_module, backbone_kwargs = BACKBONES[self.backbone_name]
+            config.backbone_kwargs.update(backbone_kwargs)
         else:
             print("Unknown backbone; setting to default MobileNet3D")
-            self.backbone = BACKBONES["mobilenet"](in_channels=config.in_channels,
-                                                   **config.backbone_kwargs)
+            backbone_module, backbone_kwargs = BACKBONES["mobilenet"]
+            config.backbone_kwargs.update(backbone_kwargs)
+
+        self.backbone = backbone_module(in_channels=config.in_channels,
+                                        **config.backbone_kwargs)
 
         self.aspp = ASPP3d(in_channels=self.backbone.hlf_channels,
                            atrous_rates=self.atrous_rates)
