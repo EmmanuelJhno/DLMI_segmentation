@@ -92,12 +92,9 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
 
         writer.add_scalar('train_batch_loss', avg_loss, batch_idx +len(data_loader) * epoch)
 
-<<<<<<< HEAD
-        dice_epoch += 1 - loss 
-=======
         dice_epoch += 1 - loss
         iou_epoch += batch_iou
->>>>>>> 937db0fc3017be8521fe72f40fbacf5a0910970a
+
             
     dice_epoch = dice_epoch/len(data_loader)
     iou_epoch = iou_epoch / len(data_loader)
@@ -244,18 +241,14 @@ def main(raw_args=None):
         val_dataset = LiTSDataset(data_path, val, no_tumor=True)
         test_dataset = LiTSDataset(data_path, test, no_tumor=True)
     
-<<<<<<< HEAD
-    train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=True)
-    val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
-    test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers, batch_size=config.training.batch_size, shuffle=False)
-=======
+
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers,
                                   batch_size=config.training.batch_size, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers,
                                 batch_size=config.training.batch_size, shuffle=False)
     test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers,
                                   batch_size=config.training.batch_size, shuffle=False)
->>>>>>> 937db0fc3017be8521fe72f40fbacf5a0910970a
+
     # Compute on gpu or cpu
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
