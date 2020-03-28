@@ -201,9 +201,9 @@ def main(raw_args=None):
 
     with open(os.path.join(log_path,' splits.json'), 'w+') as file:
         json.dump({
-            "train": train,
-            "val": val,
-            "test": test
+            "train": train.tolist(),
+            "val": val.tolist(),
+            "test": test.tolist()
         }, file)
     
     # reset the previous seed
