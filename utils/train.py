@@ -128,6 +128,7 @@ def evaluate(config, model, data_loader, device, epoch, writer):
             
         val_loss = validation_loss/len(data_loader)
         validation_dice = validation_dice/len(data_loader)
+        validation_iou = validation_iou/len(data_loader)
         writer.add_scalar('val_epoch_loss', val_loss, epoch)
         writer.add_scalar('val_epoch_dice', validation_dice, epoch)
         writer.add_scalar('val_epoch_iou', validation_iou, epoch)
