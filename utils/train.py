@@ -302,7 +302,7 @@ def main(raw_args=None):
         lr_scheduler.step()
 
         if eval_score['validation_dice'] > best_scores['validation_dice']: 
-            torch.save(model.state_dict(), os.path.join(log_path,'best_{:.4f}.pth'.format(eval_score['validation_dice'])))
+            torch.save(model.state_dict(), os.path.join(log_path,'best_{}.pth'.format('validation_dice')))
             best_scores['validation_dice'] = eval_score['validation_dice']
         elif epoch % 3 == 0 or epoch == config.training.epochs - 1:
             torch.save(model.state_dict(), os.path.join(log_path, 'epoch_{}.pth'.format(epoch)))
