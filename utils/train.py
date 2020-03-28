@@ -95,6 +95,7 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         dice_epoch += 1 - loss
         iou_epoch += batch_iou
 
+            
     dice_epoch = dice_epoch/len(data_loader)
     iou_epoch = iou_epoch / len(data_loader)
     print('epoch : {0} train_loss : {1} | train_dice : {2} | train_iou : {3}'
@@ -240,12 +241,14 @@ def main(raw_args=None):
         val_dataset = LiTSDataset(data_path, val, no_tumor=True)
         test_dataset = LiTSDataset(data_path, test, no_tumor=True)
     
+
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers,
                                   batch_size=config.training.batch_size, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, num_workers=config.dataset.num_workers,
                                 batch_size=config.training.batch_size, shuffle=False)
     test_dataloader  = DataLoader(dataset=test_dataset,  num_workers=config.dataset.num_workers,
                                   batch_size=config.training.batch_size, shuffle=False)
+
     # Compute on gpu or cpu
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model.to(device)
