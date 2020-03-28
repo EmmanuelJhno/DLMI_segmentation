@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.blocks import UnetConv3, MultiAttentionBlock, UnetGridGatingSignal3, UnetUp3_CT, UnetDsv3
+from models.blocks import UnetConv3, UnetUp3
 
 
 class Unet3D(nn.Module):
@@ -49,9 +49,6 @@ class Unet3D(nn.Module):
         self.is_batchnorm = config.is_batchnorm
         self.feature_scale = config.feature_scale
 
-        nonlocal_mode = 'concatenation'
-        attention_dsample = (2, 2, 2)
-
         filters = [64, 128, 256, 512, 1024]
         filters = [int(x / self.feature_scale) for x in filters]
 
@@ -69,31 +66,15 @@ class Unet3D(nn.Module):
         self.maxpool4 = nn.MaxPool3d(kernel_size=(2, 2, 2))
 
         self.center = UnetConv3(filters[3], filters[4], self.is_batchnorm)
-        self.gating = UnetGridGatingSignal3(filters[4], filters[4], kernel_size=(1, 1, 1),
-                                            is_batchnorm=self.is_batchnorm)
-
-        # attention blocks
-        self.attentionblock2 = MultiAttentionBlock(in_size=filters[1], gate_size=filters[2], inter_size=filters[1],
-                                                   nonlocal_mode=nonlocal_mode, sub_sample_factor=attention_dsample)
-        self.attentionblock3 = MultiAttentionBlock(in_size=filters[2], gate_size=filters[3], inter_size=filters[2],
-                                                   nonlocal_mode=nonlocal_mode, sub_sample_factor=attention_dsample)
-        self.attentionblock4 = MultiAttentionBlock(in_size=filters[3], gate_size=filters[4], inter_size=filters[3],
-                                                   nonlocal_mode=nonlocal_mode, sub_sample_factor=attention_dsample)
 
         # upsampling
-        self.up_concat4 = UnetUp3_CT(filters[4], filters[3], self.is_deconv)
-        self.up_concat3 = UnetUp3_CT(filters[3], filters[2], self.is_deconv)
-        self.up_concat2 = UnetUp3_CT(filters[2], filters[1], self.is_deconv)
-        self.up_concat1 = UnetUp3_CT(filters[1], filters[0], self.is_deconv)
-
-        # deep supervision
-        self.dsv4 = UnetDsv3(in_size=filters[3], out_size=self.num_classes, scale_factor=8)
-        self.dsv3 = UnetDsv3(in_size=filters[2], out_size=self.num_classes, scale_factor=4)
-        self.dsv2 = UnetDsv3(in_size=filters[1], out_size=self.num_classes, scale_factor=2)
-        self.dsv1 = nn.Conv3d(in_channels=filters[0], out_channels=self.num_classes, kernel_size=1)
+        self.up_concat4 = UnetUp3(filters[4], filters[3], self.is_deconv, self.is_batchnorm)
+        self.up_concat3 = UnetUp3(filters[3], filters[2], self.is_deconv, self.is_batchnorm)
+        self.up_concat2 = UnetUp3(filters[2], filters[1], self.is_deconv, self.is_batchnorm)
+        self.up_concat1 = UnetUp3(filters[1], filters[0], self.is_deconv, self.is_batchnorm)
 
         # final conv (without any concat)
-        self.final = nn.Conv3d(self.num_classes * 4, self.num_classes, 1)
+        self.final = nn.Conv3d(filters[0], self.num_classes, 1)
 
         # initialise weights
         for m in self.modules():
@@ -109,7 +90,6 @@ class Unet3D(nn.Module):
                     nn.init.constant(m.bias.data, 0.0)
 
     def forward(self, inputs):
-        # Feature Extraction
         conv1 = self.conv1(inputs)
         maxpool1 = self.maxpool1(conv1)
 
@@ -122,28 +102,16 @@ class Unet3D(nn.Module):
         conv4 = self.conv4(maxpool3)
         maxpool4 = self.maxpool4(conv4)
 
-        # Gating Signal Generation
         center = self.center(maxpool4)
-        gating = self.gating(center)
-
-        # Attention Mechanism
-        # Upscaling Part (Decoder)
-        g_conv4, att4 = self.attentionblock4(conv4, gating)
-        up4 = self.up_concat4(g_conv4, center)
-        g_conv3, att3 = self.attentionblock3(conv3, up4)
-        up3 = self.up_concat3(g_conv3, up4)
-        g_conv2, att2 = self.attentionblock2(conv2, up3)
-        up2 = self.up_concat2(g_conv2, up3)
+        up4 = self.up_concat4(conv4, center)
+        up3 = self.up_concat3(conv3, up4)
+        up2 = self.up_concat2(conv2, up3)
         up1 = self.up_concat1(conv1, up2)
 
-        # Deep Supervision
-        dsv4 = self.dsv4(up4)
-        dsv3 = self.dsv3(up3)
-        dsv2 = self.dsv2(up2)
-        dsv1 = self.dsv1(up1)
-        final = self.final(torch.cat([dsv1, dsv2, dsv3, dsv4], dim=1))
+        final = self.final(up1)
         pred = F.softmax(final, dim=1)
         return pred
+
 
 #     @staticmethod
 #     def apply_argmax_softmax(pred):
