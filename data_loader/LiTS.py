@@ -74,7 +74,9 @@ class LiTSDataset(data.Dataset):
     def __init__(self, root_dir, split, augment=None, 
                  physical_reference_size=(512,512,512),spacing = 2, 
                  aug_parameters=default_aug,
-                 bounding_box=default_bounding_box, no_tumor=True):
+                 bounding_box=default_bounding_box, 
+                 no_tumor=True,
+                 inference_mode=False):
         """
         returns a dataset for the LiTS challenge.
         Args:
@@ -83,11 +85,15 @@ class LiTSDataset(data.Dataset):
                 competition website. 
         split: list of int, the id of the files in the split to be loaded (eg: 1 
                 for volume-1.nii).
+        inferenece_mode: boolean in inference we return a dictionnary instead of the target 
         """
 
         super(LiTSDataset, self).__init__()
         self.no_tumor = no_tumor
         self.augment = augment
+        self.inference_mode = inference_mode
+        if self.inference_mode :
+            self.transform_dict = {}
         self.aug_parameters = aug_parameters
         self.bounding_box = bounding_box
         self.image_filenames = []
@@ -116,10 +122,9 @@ class LiTSDataset(data.Dataset):
 
     def __getitem__(self, index):
         img = sitk.ReadImage(self.image_filenames[index])
-        mask = sitk.ReadImage(self.mask_filenames[index])
 
+        # we generate the SiTK transform for normalization and data-augmentation(if needed)
         transform = self.get_normalization_transform(img)
-
         if self.augment: 
             aug_transform = sitk.Similarity3DTransform()
             aug_transform.SetCenter(self.reference_center)
@@ -133,15 +138,10 @@ class LiTSDataset(data.Dataset):
                               (aug['scale'][1]-aug['scale'][0])*np.random.random() + aug['scale'][0]]
             aug_transform.SetParameters(aug_parameters) 
             transform.AddTransform(aug_transform)
+            
         input = sitk.Resample(img, self.reference_image, transform)
-        target = sitk.Resample(mask, self.reference_image, transform)
-        # return input, target
         input = sitk.GetArrayFromImage(input)
-        target = sitk.GetArrayFromImage(target)
-        if self.no_tumor:
-            target = np.clip(target, a_min=0, a_max=1)
         
- 
         ax_1, ax_2, ax_3 = self.physical_reference_size
         bb = np.array([ax_1, ax_1, ax_2, ax_2, ax_3, ax_3])
         bb = self.bounding_box * bb / self.spacing
@@ -149,24 +149,44 @@ class LiTSDataset(data.Dataset):
         input = input.astype('float32')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
         input = np.clip(input, -200., 250.)
         input = (input + 200.) / 450.
-        target = target.astype('int')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
-        
-        one_hot_target = np.zeros(target.shape + (target.max()+1,))
-        
-
-        target = np.expand_dims(target,axis=-1)
-        if self.no_tumor:
-            num_class = 2
-        else : 
-            num_class = 3
-            
-        one_hot_target = (torch.from_numpy(target) == torch.arange(num_class).reshape(1, num_class)).int()
-        
         input = torch.from_numpy(np.expand_dims(input,axis=0)) # we add the channel dimension
         
-        one_hot_target = one_hot_target.permute(3,0,1,2)
-        return input, one_hot_target
+        dic = {}
+        one_hot_target = None
+        if os.path.exists(self.mask_filenames[index]):
+            mask = sitk.ReadImage(self.mask_filenames[index])
+            target = sitk.Resample(mask, self.reference_image, transform)
+            target = sitk.GetArrayFromImage(target)
+            if self.no_tumor:
+                target = np.clip(target, a_min=0, a_max=1)
+            target = target.astype('int')[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
 
+            one_hot_target = np.zeros(target.shape + (target.max()+1,))
+            target = np.expand_dims(target,axis=-1)
+            if self.no_tumor:
+                num_class = 2
+            else : 
+                num_class = 3   
+            one_hot_target = (torch.from_numpy(target) == torch.arange(num_class).reshape(1, num_class)).int()
+            one_hot_target = one_hot_target.permute(3,0,1,2)
+            dic["original_mask_path"] = self.mask_filenames[index] 
+            
+        if self.inference_mode: 
+            dic["bounding_box"] = bb
+#             dic["inverse_transform"] = transform.GetInverse()
+            dic["original_image_path"] = self.image_filenames[index] 
+            dic["one_hot_target"] = one_hot_target
+            self.transform_dict[self.image_filenames[index]] = dic
+            return input, dic
+#             return input, {"orginal_image_path" : self.image_filenames[index], "one_hot_target" : one_hot_target}
+        
+        elif not one_hot_target is None: 
+            return input, one_hot_target
+        
+        else :
+            raise ValueError('Error Loading the mask')
+            
+            
     def set_reference_space(self):
         img = sitk.ReadImage(self.image_filenames[0])
         self.dimension = img.GetDimension()
