@@ -48,13 +48,32 @@ This should be differentiable.
     A_sum = torch.sum(tflat * iflat, dim=(2,3,4))
     B_sum = torch.sum(tflat * tflat , dim=(2,3,4))
     
-    return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth) )                
-                
+    return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth) )
+
+def iou(pred, target):
+    """
+    Computes IoU of pred and target
+
+    Args:
+        pred (torch.Tensor)
+        target (torch.Tensor)
+
+    Returns:
+        torch.Tensor: IoU score for each sample in the batch
+    """
+    smooth = 1.
+    pred = pred[:, 1, :, :, :]
+    target = target[:, 1, :, :]
+    intersection = (pred & target).float().sum(dim=(2, 3, 4))
+    union = (pred | target).float().sum(dim=(2, 3, 4))
+    return (intersection + smooth) / (union + smooth)
+
                 
 def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer, freq_print=10000):
     model.train()
     avg_loss = 0
     dice_epoch = 0
+    iou_epoch = 0.
     
         
     for batch_idx, (data, target) in enumerate(data_loader):
@@ -64,6 +83,7 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         output = model(data)
         #### Check dimension of the loss sould be bsx1 for later averaging
         batch_loss = dice_loss(output, target)
+        batch_iou = torch.mean(iou(output, target))
         loss = torch.mean(batch_loss[:,1])
         loss.backward()
         optimizer.step()
@@ -81,13 +101,17 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
 
         writer.add_scalar('train_batch_loss', avg_loss, batch_idx +len(data_loader) * epoch)
 
-        dice_epoch += 1 - loss 
+        dice_epoch += 1 - loss
+        iou_epoch += batch_iou
             
     dice_epoch = dice_epoch/len(data_loader)
-    print('epoch : {0} train_loss : {1} | train_dice : {2}'.format(epoch, avg_loss, dice_epoch))
+    iou_epoch = iou_epoch / len(data_loader)
+    print('epoch : {0} train_loss : {1} | train_dice : {2} | train_iou : {3}'
+          .format(epoch, avg_loss, dice_epoch, iou_epoch))
 
     writer.add_scalar('train_epoch_loss', avg_loss, epoch)
     writer.add_scalar('train_epoch_dice', dice_epoch, epoch)
+    writer.add_scalar('train_epoch_iou', iou_epoch, epoch)
     
     return writer
     
@@ -97,6 +121,7 @@ def evaluate(config, model, data_loader, device, epoch, writer):
     with torch.no_grad():
         validation_loss = 0
         validation_dice = 0
+        validation_iou = 0
         
         for batch_idx, (data, target) in enumerate(data_loader):
             # Compute the scores
@@ -104,17 +129,21 @@ def evaluate(config, model, data_loader, device, epoch, writer):
             output = model(data)
             batch_loss = dice_loss(output, target)
             batch_dice_loss = torch.mean(batch_loss[:,1])
+            batch_iou = torch.mean(iou(output, target))
             validation_loss += batch_dice_loss  
             validation_dice += 1 - batch_dice_loss
+            validation_iou += batch_iou
             
         val_loss = validation_loss/len(data_loader)
         validation_dice = validation_dice/len(data_loader)
         writer.add_scalar('val_epoch_loss', val_loss, epoch)
         writer.add_scalar('val_epoch_dice', validation_dice, epoch)
+        writer.add_scalar('val_epoch_iou', validation_iou, epoch)
         eval_score = {}
-        eval_score['val_loss'], eval_score['validation_dice'] = val_loss, validation_dice
+        eval_score['val_loss'], eval_score['validation_dice'], eval_score['validation_iou'] = val_loss, validation_dice, validation_iou
         #print('epoch : {} val_loss : {} , top1_acc {},  top3_acc {}'.format(epoch, val_loss, top1_acc, top3_acc))
-        print('epoch : {0} val_loss : {1} | dice {2}'.format(epoch, val_loss, validation_dice))
+        print('epoch : {0} val_loss : {1} | dice : {2} | iou : {3}'
+              .format(epoch, val_loss, validation_dice, validation_iou))
     return writer, eval_score
             
             
