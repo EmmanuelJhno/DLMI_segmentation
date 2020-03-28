@@ -3,8 +3,8 @@
     "name" : "unet",
     "num_classes": 2,
     "in_channels": 1,
-    "is_batchnorm": true,
-    "is_deconv": true
+    "is_batchnorm": false,
+    "is_deconv": false
     },
     
 "optimizer" : {
@@ -24,7 +24,7 @@
      
  "training" : {
      "batch_size" : 4,
-     "epochs" : 50,
+     "epochs" : 30,
      "class_weights_alpha" : 1
     }
 }

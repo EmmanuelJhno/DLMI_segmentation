@@ -38,17 +38,9 @@ This should be differentiable.
     target: tensor with first dimension as batch
     """
 
-    smooth = 1.
-
-    # have to use contiguous since they may from a torch.view op
-    iflat = pred.contiguous()
-    tflat = target.contiguous()
-    intersection = (iflat * tflat).sum(dim=(2,3,4))
-
-    A_sum = torch.sum(tflat * iflat, dim=(2,3,4))
-    B_sum = torch.sum(tflat * tflat , dim=(2,3,4))
-    
-    return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth) )                
+    smooth = 1e-5
+    intersection = (pred * target).sum(dim=(2,3,4))
+    return 1 - ((2. * intersection + smooth) / (torch.sum(pred, dim=(2,3,4)) + torch.sum(target , dim=(2,3,4)) + smooth))               
                 
                 
 def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer, freq_print=10000):
