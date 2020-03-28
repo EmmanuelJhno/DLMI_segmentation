@@ -60,16 +60,16 @@ def eul2quat(ax, ay, az, atol=1e-8):
 
 
 class LiTSDataset(data.Dataset):
-    default_aug = {'thetaX': [-10*np.pi/180,10*np.pi/180],
-                   'thetaY': [-10*np.pi/180,10*np.pi/180],
-                   'thetaZ': [-10*np.pi/180,10*np.pi/180],
-                   'transX': [-10,10],
-                   'transY': [-5,5],
-                   'transZ': [-5,5],
-                   'scale' : [0.8,1.2]
+    default_aug = {'thetaX': [-10, 10],
+                   'thetaY': [-10, 10],
+                   'thetaZ': [-10, 10],
+                   'transX': [-10, 10],
+                   'transY': [-5, 5],
+                   'transZ': [-5, 5],
+                   'scale': [0.8, 1.2]
                    }
     # default bounding box for the liver (adjusted on the train set)
-    default_bounding_box = np.asarray([0.35,0.85,0.2,0.7,0.1,0.6])
+    default_bounding_box = [0.35, 0.85, 0.2, 0.7, 0.1, 0.6]
 
     def __init__(self, root_dir, split, augment=None,
                  physical_reference_size=(512, 512, 512),
@@ -95,8 +95,11 @@ class LiTSDataset(data.Dataset):
         self.inference_mode = inference_mode
         if self.inference_mode:
             self.transform_dict = {}
+        for direction in ['X', 'Y', 'Z']:
+            angle1, angle2 = aug_parameters['theta' + direction]
+            aug_parameters['theta' + direction] = [angle1 * np.pi / 180, angle2 * np.pi / 180]
         self.aug_parameters = aug_parameters
-        self.bounding_box = bounding_box
+        self.bounding_box = np.asarray(bounding_box)
         self.image_filenames = []
         self.mask_filenames = []
         self.physical_reference_size = np.asarray(physical_reference_size)

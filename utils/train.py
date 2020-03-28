@@ -234,13 +234,41 @@ def main(raw_args=None):
     
     # Setup Data Loader
     if args.debug: 
-        train_dataset = LiTSDataset(data_path, train[:1], augment=False, no_tumor=True)
-        val_dataset = LiTSDataset(data_path, train[:1], no_tumor=True)
-        test_dataset = LiTSDataset(data_path, train[:1], no_tumor=True)
+        train_dataset = LiTSDataset(data_path, train[:1], no_tumor=True,
+                                    augment=None,
+                                    aug_parameters=config.dataset.aug_parameters,
+                                    bounding_box=config.dataset.bounding_box,
+                                    spacing=config.dataset.spacing,
+                                    physical_reference_size=config.dataset.physical_reference_size)
+        val_dataset = LiTSDataset(data_path, train[:1], no_tumor=True,
+                                  aug_parameters=config.dataset.aug_parameters,
+                                  bounding_box=config.dataset.bounding_box,
+                                  spacing=config.dataset.spacing,
+                                  physical_reference_size=config.dataset.physical_reference_size)
+        test_dataset = LiTSDataset(data_path, train[:1], no_tumor=True,
+                                   aug_parameters=config.dataset.aug_parameters,
+                                   bounding_box=config.dataset.bounding_box,
+                                   spacing=config.dataset.spacing,
+                                   physical_reference_size=config.dataset.physical_reference_size)
     else :
-        train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True)
-        val_dataset = LiTSDataset(data_path, val, no_tumor=True)
-        test_dataset = LiTSDataset(data_path, test, no_tumor=True)
+        train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True,
+
+                                    aug_parameters=config.dataset.aug_parameters,
+                                    bounding_box=config.dataset.bounding_box,
+                                    spacing=config.dataset.spacing,
+                                    physical_reference_size=config.dataset.physical_reference_size
+                                    )
+        val_dataset = LiTSDataset(data_path, val, no_tumor=True,
+                                  aug_parameters=config.dataset.aug_parameters,
+                                  bounding_box=config.dataset.bounding_box,
+                                  spacing=config.dataset.spacing,
+                                  physical_reference_size=config.dataset.physical_reference_size
+                                  )
+        test_dataset = LiTSDataset(data_path, test, no_tumor=True,
+                                   aug_parameters=config.dataset.aug_parameters,
+                                   bounding_box=config.dataset.bounding_box,
+                                   spacing=config.dataset.spacing,
+                                   physical_reference_size=config.dataset.physical_reference_size)
     
 
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers,
