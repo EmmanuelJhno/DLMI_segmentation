@@ -60,8 +60,6 @@ def iou(pred, target):
     union = (pred | target).float().sum(dim=(1, 2, 3))
     return (intersection + smooth) / (union + smooth)
 
->>>>>>> 937db0fc3017be8521fe72f40fbacf5a0910970a
-                
 def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer, freq_print=10000):
     model.train()
     avg_loss = 0
