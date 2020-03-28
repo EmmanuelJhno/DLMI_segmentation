@@ -71,7 +71,7 @@ class LiTSDataset(data.Dataset):
     # default bounding box for the liver (adjusted on the train set)
     default_bounding_box = [0.35, 0.85, 0.2, 0.7, 0.1, 0.6]
 
-    def __init__(self, root_dir, split, augment=None,
+    def __init__(self, root_dir, split, augment=False,
                  physical_reference_size=(512, 512, 512),
                  spacing=2,
                  aug_parameters=default_aug,
@@ -159,6 +159,9 @@ class LiTSDataset(data.Dataset):
         one_hot_target = None
         if os.path.exists(self.mask_filenames[index]):
             mask = sitk.ReadImage(self.mask_filenames[index])
+            mask.SetOrigin(img.GetOrigin())
+            mask.SetDirection(img.GetDirection())
+            mask.SetSpacing(img.GetSpacing())
             target = sitk.Resample(mask, self.reference_image, transform, sitk.sitkNearestNeighbor)
             target = sitk.GetArrayFromImage(target)
             if self.no_tumor:
