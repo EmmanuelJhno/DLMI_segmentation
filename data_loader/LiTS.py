@@ -96,8 +96,8 @@ class LiTSDataset(data.Dataset):
         if self.inference_mode:
             self.transform_dict = {}
         for direction in ['X', 'Y', 'Z']:
-            angle1, angle2 = getattr(aug_parameters, 'theta' + direction)
-            setattr(aug_parameters, 'theta' + direction, [angle1 * np.pi / 180, angle2 * np.pi / 180])
+            angle1, angle2 = aug_parameters['theta' + direction]
+            aug_parameters['theta' + direction] = [angle1 * np.pi / 180, angle2 * np.pi / 180]
         self.aug_parameters = aug_parameters
         self.bounding_box = np.asarray(bounding_box)
         self.image_filenames = []

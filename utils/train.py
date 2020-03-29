@@ -1,7 +1,7 @@
 import os
 import sys
 from copy import deepcopy
-import json  
+import json
 import argparse
 import datetime
 
@@ -29,8 +29,7 @@ class ObjFromDict:
                 setattr(self, a, [ObjFromDict(x) if isinstance(x, dict) else x for x in b])
             else:
                 setattr(self, a, ObjFromDict(b) if isinstance(b, dict) else b)
-                
-                
+
 def dice_loss(pred, target):
     """This definition generalize to real valued pred and target vector.
 This should be differentiable.
@@ -40,7 +39,7 @@ This should be differentiable.
 
     smooth = 1e-5
     intersection = (pred * target).sum(dim=(2,3,4))
-    return 1 - ((2. * intersection + smooth) / (torch.sum(pred, dim=(2,3,4)) + torch.sum(target , dim=(2,3,4)) + smooth))               
+    return 1 - ((2. * intersection + smooth) / (torch.sum(pred, dim=(2,3,4)) + torch.sum(target , dim=(2,3,4)) + smooth))
 
 def iou(pred, target):
     """
@@ -65,8 +64,8 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
     avg_loss = 0
     dice_epoch = 0
     iou_epoch = 0.
-    
-        
+
+
     for batch_idx, (data, target) in enumerate(data_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -78,9 +77,9 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         loss = torch.mean(batch_loss[:,1])
         loss.backward()
         optimizer.step()
-    
-            
-        if avg_loss == 0 : 
+
+
+        if avg_loss == 0 :
             avg_loss = loss.item()
         avg_loss = 0.9 * avg_loss + 0.1 * loss.item()
         if batch_idx % freq_print == 0:
@@ -95,7 +94,7 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         dice_epoch += 1 - loss
         iou_epoch += batch_iou
 
-            
+
     dice_epoch = dice_epoch/len(data_loader)
     iou_epoch = iou_epoch / len(data_loader)
     print('epoch : {0} train_loss : {1} | train_dice : {2} | train_iou : {3}'
@@ -104,17 +103,17 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
     writer.add_scalar('train_epoch_loss', avg_loss, epoch)
     writer.add_scalar('train_epoch_dice', dice_epoch, epoch)
     writer.add_scalar('train_epoch_iou', iou_epoch, epoch)
-    
+
     return writer
-    
-            
+
+
 def evaluate(config, model, data_loader, device, epoch, writer):
     model.eval()
     with torch.no_grad():
         validation_loss = 0
         validation_dice = 0
         validation_iou = 0
-        
+
         for batch_idx, (data, target) in enumerate(data_loader):
             # Compute the scores
             data, target = data.to(device), target.to(device)
@@ -122,10 +121,10 @@ def evaluate(config, model, data_loader, device, epoch, writer):
             batch_loss = dice_loss(output, target)
             batch_dice_loss = torch.mean(batch_loss[:,1])
             batch_iou = torch.mean(iou(output, target))
-            validation_loss += batch_dice_loss  
+            validation_loss += batch_dice_loss
             validation_dice += 1 - batch_dice_loss
             validation_iou += batch_iou
-            
+
         val_loss = validation_loss/len(data_loader)
         validation_dice = validation_dice/len(data_loader)
         validation_iou = validation_iou/len(data_loader)
@@ -138,19 +137,19 @@ def evaluate(config, model, data_loader, device, epoch, writer):
         print('epoch : {0} val_loss : {1} | dice : {2} | iou : {3}'
               .format(epoch, val_loss, validation_dice, validation_iou))
     return writer, eval_score
-            
-            
+
+
 def main(raw_args=None):
     """
     Main function to run the code. Can either take the raw_args in argument or get the arguments from the config_file.
     """
-    
+
     #-----------------------------------------------------------------------------------------
     ### First, set the parameters of the function, including the config file, log directory and the seed.
-    parser = argparse.ArgumentParser()    
-    parser.add_argument('--config_file', required=True, 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_file', required=True,
                         type=str,help = 'path to the config file for the training')
-    parser.add_argument('--logdir', required=True, 
+    parser.add_argument('--logdir', required=True,
                         type=str,help = 'path to the directory containing all run folders')
     parser.add_argument('--num_workers', type=int, default=4,
                         help='dataloader threads')
@@ -159,7 +158,7 @@ def main(raw_args=None):
     parser.add_argument('--debug', action='store_true', default=False,
                         help='whether to debug or not')
     args = parser.parse_args(raw_args)
-    
+
     print("SEED used is ", args.seed) # Allows to quickly know if you set the wrong seed
     torch.manual_seed(args.seed) # the seed for every torch calculus
     np.random.seed(args.seed) # the seed for every numpy calculus
@@ -167,7 +166,7 @@ def main(raw_args=None):
     ### Prepare the log by adding the config with runtime and seed
     with open(args.config_file) as json_file:
         config = json.load(json_file)
-       
+
     try :
         print( 'loss type is', config['training']['loss']['type'])
     except:
@@ -178,10 +177,10 @@ def main(raw_args=None):
     config['runtime']['num_workers'] = args.num_workers
     config['dataset']['num_workers'] = args.num_workers
     config['runtime']['SEED'] = args.seed
-    
+
     if not os.path.exists(args.logdir):
         os.mkdir(args.logdir)
-        
+
     time = datetime.datetime.today()
     log_id = '{}_{}h{}min'.format(time.date(), time.hour, time.minute)
     log_path = os.path.join(args.logdir,log_id)
@@ -197,26 +196,26 @@ def main(raw_args=None):
             log_path = os.path.join(args.logdir,log_id)
     with open(os.path.join(log_path,'config.json'), 'w') as file:
         json.dump(config, file)
-        
+
 
     #-----------------------------------------------------------------------------------------
     ### Get the parameters according to the configuration
     config = ObjFromDict(config)
-    
+
     model = get_model(config.model)
-    
+
     data_path = config.dataset.root
     print('data_path ', data_path)
-    
+
     # fix the seed for the split
-    split_seed = 0 
+    split_seed = 0
     np.random.seed(split_seed)
-    
+
     image_dir = os.listdir(os.path.join(data_path,'Training Batch 1')) + os.listdir(os.path.join(data_path,'Training Batch 2'))
     all_indexes = [ int(file_name[7:-4]) for file_name in image_dir if 'volume' in file_name]
     split = np.random.permutation(all_indexes)
     n_train, n_val, n_test = int(0.8 * len(split)), int(0.1 * len(split)), int(0.1 * len(split))
-    
+
     train = split[: n_train]
     val = split[n_train : n_train+n_val]
     test = split[n_train + n_val :]
@@ -227,49 +226,49 @@ def main(raw_args=None):
             "val": val.tolist(),
             "test": test.tolist()
         }, file)
-    
+
     # reset the previous seed
     torch.manual_seed(args.seed) # the seed for every torch calculus
     np.random.seed(args.seed)
-    
+
     # Setup Data Loader
-    if args.debug: 
+    if args.debug:
         train_dataset = LiTSDataset(data_path, train[:1], no_tumor=True,
                                     augment=None,
-                                    aug_parameters=config.dataset.aug_parameters,
+                                    aug_parameters=vars(config.dataset.aug_parameters),
                                     bounding_box=config.dataset.bounding_box,
                                     spacing=config.dataset.spacing,
                                     physical_reference_size=config.dataset.physical_reference_size)
         val_dataset = LiTSDataset(data_path, train[:1], no_tumor=True,
-                                  aug_parameters=config.dataset.aug_parameters,
+                                  aug_parameters=vars(config.dataset.aug_parameters),
                                   bounding_box=config.dataset.bounding_box,
                                   spacing=config.dataset.spacing,
                                   physical_reference_size=config.dataset.physical_reference_size)
         test_dataset = LiTSDataset(data_path, train[:1], no_tumor=True,
-                                   aug_parameters=config.dataset.aug_parameters,
+                                   aug_parameters=vars(config.dataset.aug_parameters),
                                    bounding_box=config.dataset.bounding_box,
                                    spacing=config.dataset.spacing,
                                    physical_reference_size=config.dataset.physical_reference_size)
     else :
         train_dataset = LiTSDataset(data_path, train, augment=True, no_tumor=True,
 
-                                    aug_parameters=config.dataset.aug_parameters,
+                                    aug_parameters=vars(config.dataset.aug_parameters),
                                     bounding_box=config.dataset.bounding_box,
                                     spacing=config.dataset.spacing,
                                     physical_reference_size=config.dataset.physical_reference_size
                                     )
         val_dataset = LiTSDataset(data_path, val, no_tumor=True,
-                                  aug_parameters=config.dataset.aug_parameters,
+                                  aug_parameters=vars(config.dataset.aug_parameters),
                                   bounding_box=config.dataset.bounding_box,
                                   spacing=config.dataset.spacing,
                                   physical_reference_size=config.dataset.physical_reference_size
                                   )
         test_dataset = LiTSDataset(data_path, test, no_tumor=True,
-                                   aug_parameters=config.dataset.aug_parameters,
+                                   aug_parameters=vars(config.dataset.aug_parameters),
                                    bounding_box=config.dataset.bounding_box,
                                    spacing=config.dataset.spacing,
                                    physical_reference_size=config.dataset.physical_reference_size)
-    
+
 
     train_dataloader = DataLoader(dataset=train_dataset, num_workers=config.dataset.num_workers,
                                   batch_size=config.training.batch_size, shuffle=True)
@@ -285,7 +284,7 @@ def main(raw_args=None):
     # trainable parameters
     params = [p for p in model.parameters() if p.requires_grad]
     # optimizer and learning rate
-    optimizer = torch.optim.Adam(params, lr=config.optimizer.learning_rate, 
+    optimizer = torch.optim.Adam(params, lr=config.optimizer.learning_rate,
                                  weight_decay=config.optimizer.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                    step_size=config.optimizer.lr_scheduler.step_size,
@@ -301,16 +300,16 @@ def main(raw_args=None):
         writer, eval_score = evaluate(config, model, val_dataloader, device, epoch, writer)
         lr_scheduler.step()
 
-        if eval_score['validation_dice'] > best_scores['validation_dice']: 
+        if eval_score['validation_dice'] > best_scores['validation_dice']:
             torch.save(model.state_dict(), os.path.join(log_path,'best_{}.pth'.format('validation_dice')))
             best_scores['validation_dice'] = eval_score['validation_dice']
         elif epoch % 3 == 0 or epoch == config.training.epochs - 1:
             torch.save(model.state_dict(), os.path.join(log_path, 'epoch_{}.pth'.format(epoch)))
-         
+
     writer.close()
-    
+
     return best_scores
-        
-        
-if __name__ == '__main__': 
+
+
+if __name__ == '__main__':
     main()
