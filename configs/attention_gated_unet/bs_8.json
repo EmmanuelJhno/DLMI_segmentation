@@ -1,0 +1,42 @@
+{
+"model" : {
+    "name" : "attention_unet",
+    "num_classes": 2,
+    "in_channels": 1,
+    "is_batchnorm": true,
+    "is_deconv": false
+    },
+    
+    
+"optimizer" : {
+    "learning_rate" : 5e-3,
+    "weight_decay" : 1e-2,
+    "lr_scheduler" : {
+        "step_size" : 10,
+        "gamma" : 0.1
+        }
+    },
+    
+ "dataset" : {
+     "name" : "LiTS",
+     "root" : "/home/raubyb/LiTS",
+     "spacing": 2,
+     "physical_reference_size": [512, 512, 512],
+     "bounding_box": [0.35, 0.85, 0.2, 0.7, 0.1, 0.6],
+     "aug_parameters": {
+         "thetaX": [-20, 20],
+         "thetaY": [-20, 20],
+         "thetaZ": [-20, 20],
+         "transX": [-20, 20],
+         "transY": [-20, 20],
+         "transZ": [-20, 20],
+         "scale": [0.75, 1.25]
+     }
+     },
+     
+ "training" : {
+     "batch_size" : 8,
+     "epochs" : 20,
+     "class_weights_alpha" : 1
+    }
+}
