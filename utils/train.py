@@ -20,7 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from data_loader.LiTS import LiTSDataset
 from models import get_model
-# from utils.utilities import ObjFromDict
+
 
 class ObjFromDict:
     def __init__(self, d):
@@ -71,7 +71,6 @@ def train_one_epoch(config, model, optimizer, data_loader, device, epoch, writer
         optimizer.zero_grad()
 
         output = model(data)
-        #### Check dimension of the loss sould be bsx1 for later averaging
         batch_loss = dice_loss(output, target)
         batch_iou = torch.mean(iou(output, target))
         loss = torch.mean(batch_loss[:,1])
@@ -133,7 +132,6 @@ def evaluate(config, model, data_loader, device, epoch, writer):
         writer.add_scalar('val_epoch_iou', validation_iou, epoch)
         eval_score = {}
         eval_score['val_loss'], eval_score['validation_dice'], eval_score['validation_iou'] = val_loss, validation_dice, validation_iou
-        #print('epoch : {} val_loss : {} , top1_acc {},  top3_acc {}'.format(epoch, val_loss, top1_acc, top3_acc))
         print('epoch : {0} val_loss : {1} | dice : {2} | iou : {3}'
               .format(epoch, val_loss, validation_dice, validation_iou))
     return writer, eval_score
@@ -167,12 +165,6 @@ def main(raw_args=None):
     with open(args.config_file) as json_file:
         config = json.load(json_file)
 
-    try :
-        print( 'loss type is', config['training']['loss']['type'])
-    except:
-        if not 'loss' in config['training'].keys() or not 'type' in config['training']['loss'].keys():
-            print('loss type is defaulted to classification_only')
-            config['training']['loss'] = {'type':'classification_only'}
     config['runtime']= {}
     config['runtime']['num_workers'] = args.num_workers
     config['dataset']['num_workers'] = args.num_workers

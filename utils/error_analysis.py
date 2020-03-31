@@ -8,13 +8,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import SimpleITK as sitk
 import tqdm
-import pandas as pd 
-import cv2
 import torch
-import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
-from torchvision import transforms
 from torch.utils.data import DataLoader
 from models import get_model
 from data_loader.LiTS import LiTSDataset
@@ -96,7 +92,6 @@ def main(raw_args=None):
 
                 data = data.to(device)
                 output = model(data)
-    #             output = target["one_hot_target"]
                 for i in range(batch_size):
                     img = sitk.ReadImage(target['original_image_path'][i])
                     normalization_transform = dataset.get_normalization_transform(img)
@@ -147,8 +142,6 @@ def main(raw_args=None):
                     ax[0,0].set_title('original image')
                     ax[0,1].set_title('ground truth')
                     ax[0,2].set_title('prediction')
-#                     img = np.rot90(img_array[:,:,best_slice_d],2)
-#                     img = cv2.resize(img,dsize=(w,d))
                     ax[0,0].imshow(np.rot90(img_array[:,:,best_slice_d],2))
                     ax[1,0].imshow(np.rot90(img_array[:,best_slice_w ,:],2))
                     ax[2,0].imshow(np.rot90(img_array[best_slice_h,:,:],2))
@@ -164,46 +157,6 @@ def main(raw_args=None):
         print('mean dice : ', np.mean(dices))
         print('dices',dices)
         
-        
-#     with open(os.path.join(output_dir, 'error_analysis.html'),'w') as file: 
-#         file.write('<!DOCTYPE html>\n'
-#                    '<html lang="fr">\n'
-#                    '  <head>\n'
-#                    '    <meta charset="utf-8">\n'
-#                    '    <title>Error_Analysis | {}</title>\n'
-#                    '  </head>\n'
-#                    '  <body>\n'
-#                    '    <div> \n'
-#                    '       <h1> Error_Analysis | {} </h1>\n'                   
-#                    '       <h2> Global Metrics : </h2>\n'
-#                    '        <p> Acc: {} <br /> Top3 acc : {}  <br /> '
-#                    '       </p>\n'
-#                    '    </div>\n'.format(run_dir.split('/')[-1],
-#                                          run_dir.split('/')[-1],
-#                                          get_accuracy(result,1), get_accuracy(result,3)
-#                                         ))
-#         file.write('    <div> \n'
-#                    '       <h2> Impact of the number of occurences : </h2>\n'
-#                    '     <img src="top1_accuracy_per_occ.jpg">\n'
-#                    '     <img src="top3_accuracy_per_occ.jpg">\n'
-#                    '    </div>\n')
-#         file.write('    <div> \n'
-#                    '       <h2> TNSE Embedding : </h2>\n'
-#                    '     <img src="pca_explained_ratio.jpg">\n')
-#         for i in highlighted_classes: 
-#             file.write('     <img src="tnse_class_{}.jpg">\n'.format(i))
-#         file.write('    </div>\n')
-        
-#         file.write('    <div> \n'
-#                    '       <h2> Grad-CAM visualizations : </h2>\n')
-#         for index in range(5): 
-#             file.write('     <img src="grad_cam_{}.jpg">\n'.format(index))
-#         file.write('    </div>\n')
-        
-#         file.write('  </body>\n'
-#                    '</html>\n')
-    
-
     
 if __name__ == '__main__': 
     main()   
