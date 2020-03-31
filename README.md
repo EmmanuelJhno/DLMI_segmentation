@@ -1,8 +1,8 @@
 # DLMI_segmentation
-This is the repository of the Efficient 3D liver segmementation of the "CentraleSupelec - Spring 2020 MVA-DLMI: Deep Learning in Medical Imaging" course. 
-In this project we tested a 3D version of Deeplab with a mobile net ad a resnet backbone and compare it to a U-net and a attention gated Unet
+This is the repository of the "Efficient 3D liver segmementation" project for the "CentraleSupelec - Spring 2020 MVA-DLMI: Deep Learning in Medical Imaging" course. 
+In this project we tested a 3D version of Deeplab with a mobile net and a resnet backbone and compare it to a U-net and a attention gated Unet
 
-The group of student was composed of three students : 
+The group of students was composed of three students : 
 - [Emmanuel Jehanno](https://github.com/EmmanuelJhno)
 - [Simon Brandeis](https://github.com/SBrandeis)
 - [Brice Rauby](https://github.com/bricerauby)
@@ -20,8 +20,8 @@ Python3
 ## Getting Started
 All the commands are to be executed from the main directory of this repository.
 ### Training 
-- From the `configs` directory, chose the json file you want to train or create a new one and adapt the datapath to the folder containing ```Training Batch 1``` and ```Training Batch 2``` downloaded. 
-- To launch a training run ```python utils/train.py --config_file=<path to config.json> --logdir=<oath to the directory containing all the log dirs>```
+- From the `configs` directory, choose the json file you want to train or create a new one and adapt the datapath to the folder containing the downloaded directories ```Training Batch 1``` and ```Training Batch 2``` . 
+- To launch a training run ```python utils/train.py --config_file=<path to config.json> --logdir=<path to the directory containing all the log dirs>```
 
 ### Evaluation 
 To evaluate a run use : 
